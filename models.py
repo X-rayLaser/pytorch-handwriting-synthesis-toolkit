@@ -32,10 +32,19 @@ class PeepholeLSTM(jit.ScriptModule):
         self.W_xh = nn.Parameter(torch.Tensor(input_size + hidden_size, hidden_size * 4))
         self.init_weights()
 
+    def get_initial_state(self, batch_size):
+        h0 = torch.zeros(batch_size, self.hidden_size)
+        c0 = torch.zeros_like(h0)
+        return h0, c0
+
     def init_weights(self):
         sd = 1.0 / math.sqrt(self.hidden_size)
         for weight in self.parameters():
             weight.data.uniform_(-sd, sd)
+
+    def set_weights(self, constant):
+        for weight in self.parameters():
+            weight.data = weight.data * 0 + constant
 
     @jit.script_method
     def forward(self, x: Tensor, states: Tuple[Tensor, Tensor]) -> Tuple[Tensor, Tuple[Tensor, Tensor]]:

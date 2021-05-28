@@ -16,7 +16,7 @@ def get_running_time(model, *inputs):
 
 input_size = 64
 hidden_size = 128
-steps = 20
+steps = 100
 
 
 def test_lstm():
@@ -66,6 +66,6 @@ def test_synthesis_network():
 
 
 test_lstm()
-test_batchless_lstm()
-test_batchless_mixture()
-test_synthesis_network()
+#test_batchless_lstm()
+#test_batchless_mixture()
+#test_synthesis_network()
