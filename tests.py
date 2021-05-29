@@ -3,6 +3,7 @@ import torch
 import shutil
 import os
 import numpy as np
+from torch.nn import functional as F
 import training
 import models
 import lstm_test_utils
@@ -463,8 +464,6 @@ class LSTMTests(unittest.TestCase):
         expected_h = expected_h.detach().numpy()
         expected_c = expected_c.detach().numpy()
 
-        print(y_hat, '\n', expected_y)
-
         self.assertTrue(np.allclose(y_hat, expected_y))
         self.assertTrue(np.allclose(h, expected_h))
         self.assertTrue(np.allclose(c, expected_c))
@@ -482,6 +481,52 @@ class LSTMTests(unittest.TestCase):
 
         cell_formula = lstm_test_utils.CellFormula(W_xc, W_hc, lstm.b_c)
         return lstm_test_utils.LSTMCell(input_gate, forget_gate, cell_formula, output_gate)
+
+
+class MixtureDensityLayerTests(unittest.TestCase):
+    def test_returns_tuple_of_tensors_with_right_shape(self):
+        batch_size = 3
+        input_size = 5
+        seq_size = 20
+        components = 10
+        mixture_layer = models.MixtureDensityLayer(input_size, components)
+
+        x = torch.zeros(batch_size, seq_size, input_size)
+
+        pi, mu, sd, ro, eos = mixture_layer(x)
+        self.assertTupleEqual(pi.shape, (batch_size, seq_size, components))
+        self.assertTupleEqual(mu.shape, (batch_size, seq_size, components * 2))
+        self.assertTupleEqual(sd.shape, (batch_size, seq_size, components * 2))
+        self.assertTupleEqual(ro.shape, (batch_size, seq_size, components))
+        self.assertTupleEqual(eos.shape, (batch_size, seq_size, 1))
+
+    def test_results(self):
+        batch_size = 3
+        input_size = 5
+        seq_size = 20
+        components = 10
+        mixture_layer = models.MixtureDensityLayer(input_size, components)
+        pi_weights = mixture_layer.pi
+        mu_weights = mixture_layer.mu
+        sd_weights = mixture_layer.sd
+        ro_weights = mixture_layer.ro
+        eos_weights = mixture_layer.eos
+
+        x = torch.zeros(batch_size, seq_size, input_size)
+
+        expected_pi = F.softmax(pi_weights(x), dim=-1)
+        expected_mu = mu_weights(x)
+        expected_sd = torch.exp(sd_weights(x))
+        expected_ro = torch.tanh(ro_weights(x))
+        expected_eos = torch.sigmoid(eos_weights(x))
+
+        pi, mu, sd, ro, eos = mixture_layer(x)
+
+        self.assertTrue(torch.allclose(expected_pi, pi))
+        self.assertTrue(torch.allclose(expected_mu, mu))
+        self.assertTrue(torch.allclose(expected_sd, sd))
+        self.assertTrue(torch.allclose(expected_ro, ro))
+        self.assertTrue(torch.allclose(expected_eos, eos))
 
 
 if __name__ == '__main__':
