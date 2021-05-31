@@ -105,5 +105,21 @@ class Mixture:
         return x.unsqueeze(1).repeat(1, self.num_components)
 
 
-def mixture_density_loss(mixture, ground_true):
-    return 0
+def negative_log_likelihood_loss(mixture, eos, ground_true):
+    y = ground_true.concatenated()
+    pi, mu, sd, ro = mixture
+    pi = ground_true.concatenate_batch(pi)
+    mu = ground_true.concatenate_batch(mu)
+    sd = ground_true.concatenate_batch(sd)
+    ro = ground_true.concatenate_batch(ro)
+
+    y1 = y[:, 0]
+    y2 = y[:, 1]
+    eos_hat = y[:, 2]
+
+    gaussian_mixture = Mixture(pi, mu, sd, ro)
+    density = gaussian_mixture.log_density(y1, y2)
+
+    binary_log_likelihood = (eos * torch.log(eos_hat) + (1 - eos) * torch.log(1 - eos_hat)).sum()
+
+    return -density - binary_log_likelihood

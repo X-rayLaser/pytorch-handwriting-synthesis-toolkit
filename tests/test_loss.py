@@ -359,5 +359,8 @@ class MixtureTests(unittest.TestCase):
         self.assertEqual(density, expected)
 
 
-# todo: implement NLL (negative log likelihood) loss for mini batches
+class LossTests(unittest.TestCase):
+    def test_loss(self):
+        self.fail('finish')
+
 # todo: numerical stability tests
