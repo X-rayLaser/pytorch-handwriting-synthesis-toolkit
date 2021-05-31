@@ -51,5 +51,59 @@ class BiVariateGaussian:
         return 2 * self.ro * (x1 - self.mu1) * (x2 - self.mu2) / (self.sd1 * self.sd2)
 
 
+class Mixture:
+    def __init__(self, pi, mu, sd, ro):
+        """
+
+        :param pi: 2D Tensor of shape (num_steps, num_components)
+        :param mu: 2D Tensor of shape (num_steps, num_components * 2)
+        :param sd: 2D Tensor of shape (num_steps, num_components * 2)
+        :param ro: 2D Tensor of shape (num_steps, num_components)
+        """
+        self.pi = pi
+        self.mu = mu
+        self.sd = sd
+        self.ro = ro
+
+    @property
+    def num_components(self):
+        return self.pi.shape[-1]
+
+    @property
+    def mu1(self):
+        return self.mu[:, :self.num_components]
+
+    @property
+    def mu2(self):
+        return self.mu[:, self.num_components:]
+
+    @property
+    def sd1(self):
+        return self.sd[:, :self.num_components]
+
+    @property
+    def sd2(self):
+        return self.sd[:, self.num_components:]
+
+    def log_density(self, x1, x2):
+        """
+
+        :param x1: 1D Tensor
+        :param x2: 1D Tensor
+        :return: scalar
+        """
+        x1 = self._prepare_x(x1)
+        x2 = self._prepare_x(x2)
+        mu = (self.mu1, self.mu2)
+        sd = (self.sd1, self.sd2)
+        gaussian = BiVariateGaussian(mu, sd, self.ro)
+        densities = gaussian.density(x1, x2)
+        mixture_densities = (densities * self.pi).sum(dim=1)
+        return torch.log(mixture_densities).sum(dim=0)
+
+    def _prepare_x(self, x):
+        return x.unsqueeze(1).repeat(1, self.num_components)
+
+
 def mixture_density_loss(mixture, ground_true):
     return 0
