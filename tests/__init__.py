@@ -9,4 +9,3 @@ if __name__ == '__main__':
 # todo: loss
 # todo: visualization (PDF heatmap, window)
 # todo: dataset
-# todo: model

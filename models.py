@@ -355,6 +355,14 @@ class MixtureDensityLayer(nn.Module):
         return pi, mu, sd, ro, eos
 
 
+class HandwritingPredictionNetwork(nn.Module):
+    def __init__(self, input_size, hidden_size, num_components):
+        super().__init__()
+
+    def forward(self, x):
+        pass
+
+
 def expand_dims(shape):
     res = 1
     for dim in shape:

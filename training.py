@@ -2,14 +2,21 @@ import math
 import os
 import torch.nn.functional
 from torch.utils.data.dataloader import DataLoader
+import utils
+import losses
+import models
 
 
 class TrainingLoop:
-    def __init__(self, dataset, batch_size):
+    def __init__(self, dataset, batch_size, training_task=None):
         self._dataset = dataset
         self._output_device = ConsoleDevice()
         self._batch_size = batch_size
-        self._trainer = TrainingTask()
+
+        if training_task is None:
+            self._trainer = TrainingTask()
+        else:
+            self._trainer = training_task
         self._callbacks = []
 
     def start(self, epochs):
@@ -57,55 +64,6 @@ class TrainingLoop:
         self._callbacks.append(cb)
 
 
-class MovingAverage:
-    def __init__(self):
-        self._value = 0
-        self._iterations = 0
-
-    @property
-    def value(self):
-        if self._iterations == 0:
-            return 0
-        return self._value / self._iterations
-
-    def update(self, v):
-        self._value += v
-        self._iterations += 1
-
-    def reset(self):
-        self._value = 0
-        self._iterations = 0
-
-
-class Metric:
-    def __init__(self):
-        self._ma = MovingAverage()
-
-    @property
-    def name(self):
-        return ''
-
-    @property
-    def value(self):
-        return self._ma.value
-
-    def update(self, y_hat, ground_true):
-        metric = self.compute_metric(y_hat, ground_true)
-        self._ma.update(metric)
-
-    def compute_metric(self, y_hat, ground_true):
-        raise NotImplemented
-
-
-class MSE(Metric):
-    @property
-    def name(self):
-        return 'MSE'
-
-    def compute_metric(self, y_hat, ground_true):
-        return torch.nn.functional.mse_loss(y_hat, ground_true)
-
-
 class TrainingTask:
     def train(self, batch):
         return 0, 0
@@ -119,13 +77,38 @@ class DummyTask(TrainingTask):
         return batch, self._loss
 
 
+class HandwritingPredictionTrainingTask(TrainingTask):
+    def __init__(self):
+        self._model = models.HandwritingPredictionNetwork(3, 900, 20)
+
+    def train(self, batch):
+        points, transcriptions = batch
+        ground_true = utils.PaddedSequencesBatch(points)
+
+        batch_size, steps, input_dim = ground_true.tensor.shape
+
+        prefix = torch.zeros(batch_size, 1, input_dim)
+        x = torch.cat([prefix, ground_true.tensor[:, :-1]], dim=1)
+
+        state = self._model.get_initial_state(batch_size)
+        y_hat = self._model(x, state)
+        mixtures, eos_hat = y_hat
+
+        y_hat = (mixtures, eos_hat)
+        loss = losses.nll_loss(mixtures, eos_hat, ground_true)
+
+        loss.backward()
+        loss.step()
+        return y_hat, loss
+
+
 class OutputDevice:
     def write(self, s, end='\n', **kwargs):
         pass
 
 
-class ConsoleDevice:
-    def write(self, s, end='\n'):
+class ConsoleDevice(OutputDevice):
+    def write(self, s, end='\n', **kwargs):
         print(s, end=end)
 
 
@@ -181,8 +164,3 @@ class IterationModelCheckpoint(Callback):
         if (iteration + 1) % self._save_interval == 0:
             save_path = os.path.join(self._save_dir, f'model_at_epoch_{iteration + 1}.pt')
             torch.save(self._model.state_dict(), save_path)
-
-
-class Formatter:
-    def format_metrics(self, epoch, iteration):
-        pass

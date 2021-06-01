@@ -105,21 +105,44 @@ class Mixture:
         return x.unsqueeze(1).repeat(1, self.num_components)
 
 
-def negative_log_likelihood_loss(mixture, eos, ground_true):
+def nll_loss(mixture, eos_hat, ground_true):
+    """
+    Compute a negative log likelihood loss for a batch of observed sequences.
+
+    :param mixture: A tuple of (pi, mu, sd, ro) tensors
+    :param eos_hat: End-Of-Stroke predictions, torch.Tensor of shape (batch_size, sequence_size, 1)
+    :param ground_true: instance of utils.PaddedSequencesBatch
+    :return: a scalar storing the value for a negative log likelihood
+    """
     y = ground_true.concatenated()
     pi, mu, sd, ro = mixture
+
+    num_components = pi.shape[-1]
+    mu1 = mu[:, :, :num_components]
+    mu2 = mu[:, :, num_components:]
+
+    sd1 = sd[:, :, :num_components]
+    sd2 = sd[:, :, num_components:]
+
     pi = ground_true.concatenate_batch(pi)
-    mu = ground_true.concatenate_batch(mu)
-    sd = ground_true.concatenate_batch(sd)
+    mu1 = ground_true.concatenate_batch(mu1)
+    mu2 = ground_true.concatenate_batch(mu2)
+    mu = torch.cat([mu1, mu2], dim=1)
+
+    sd1 = ground_true.concatenate_batch(sd1)
+    sd2 = ground_true.concatenate_batch(sd2)
+    sd = torch.cat([sd1, sd2], dim=1)
+
     ro = ground_true.concatenate_batch(ro)
 
     y1 = y[:, 0]
     y2 = y[:, 1]
-    eos_hat = y[:, 2]
+    eos = y[:, 2]
 
     gaussian_mixture = Mixture(pi, mu, sd, ro)
     density = gaussian_mixture.log_density(y1, y2)
 
     binary_log_likelihood = (eos * torch.log(eos_hat) + (1 - eos) * torch.log(1 - eos_hat)).sum()
 
-    return -density - binary_log_likelihood
+    batch_size = len(eos)
+    return -(density + binary_log_likelihood) / batch_size

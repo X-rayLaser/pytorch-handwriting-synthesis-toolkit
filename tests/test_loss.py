@@ -1,7 +1,9 @@
 import unittest
 import torch
-import loss
+import losses
 import math
+
+import utils
 
 
 class BiVariateNormalZTests(unittest.TestCase):
@@ -11,7 +13,7 @@ class BiVariateNormalZTests(unittest.TestCase):
         ro = 0.
 
         x1 = 4.
-        gaussian = loss.BiVariateGaussian(mu, sd, ro)
+        gaussian = losses.BiVariateGaussian(mu, sd, ro)
 
         res = gaussian.normalized_square(x1, mu[0], sd[0])
         expected = ((x1 - mu[0]) / sd[0]) ** 2
@@ -24,7 +26,7 @@ class BiVariateNormalZTests(unittest.TestCase):
         ro = 0.5
 
         x1, x2 = (4., 5.)
-        gaussian = loss.BiVariateGaussian(mu, sd, ro)
+        gaussian = losses.BiVariateGaussian(mu, sd, ro)
 
         res = gaussian.substraction_term(x1, x2)
         expected = 2 * ro * (x1 - mu[0]) * (x2 - mu[1]) / (sd[0] * sd[1])
@@ -38,7 +40,7 @@ class BiVariateNormalZTests(unittest.TestCase):
 
         x1 = 4.
         x2 = 4.
-        gaussian = loss.BiVariateGaussian(mu, sd, ro)
+        gaussian = losses.BiVariateGaussian(mu, sd, ro)
         z = gaussian.compute_z(x1, x2)
 
         expected = 9/4.0
@@ -51,7 +53,7 @@ class BiVariateNormalZTests(unittest.TestCase):
         ro = 0.
 
         x1, x2 = (4., 1.)
-        gaussian = loss.BiVariateGaussian(mu, sd, ro)
+        gaussian = losses.BiVariateGaussian(mu, sd, ro)
         z = gaussian.compute_z(x1, x2)
 
         expected = 9 / 16.
@@ -64,7 +66,7 @@ class BiVariateNormalZTests(unittest.TestCase):
         ro = 1
 
         x1, x2 = (4., 1.)
-        gaussian = loss.BiVariateGaussian(mu, sd, ro)
+        gaussian = losses.BiVariateGaussian(mu, sd, ro)
         z = gaussian.compute_z(x1, x2)
 
         expected = 1 + 1 - (-2)
@@ -88,11 +90,11 @@ class BiVariateNormalZTests(unittest.TestCase):
         x1 = torch.tensor([4., 6.5])
         x2 = torch.tensor([1., 3.])
 
-        gaussian = loss.BiVariateGaussian(mu, sd, ro)
+        gaussian = losses.BiVariateGaussian(mu, sd, ro)
         z = gaussian.compute_z(x1, x2)
 
-        first_component = loss.BiVariateGaussian((2., 4.), (2., 3.), 1.)
-        second_component = loss.BiVariateGaussian((5., 6.), (4., 3.), 0.5)
+        first_component = losses.BiVariateGaussian((2., 4.), (2., 3.), 1.)
+        second_component = losses.BiVariateGaussian((5., 6.), (4., 3.), 0.5)
 
         res1 = first_component.compute_z(x1[0], x2[0])
         res2 = second_component.compute_z(x1[1], x2[1])
@@ -124,10 +126,10 @@ class BiVariateNormalZTests(unittest.TestCase):
         x1 = torch.ones(*shape) * x1_value
         x2 = torch.ones(*shape) * x2_value
 
-        gaussian = loss.BiVariateGaussian(mu, sd, ro)
+        gaussian = losses.BiVariateGaussian(mu, sd, ro)
         z = gaussian.compute_z(x1, x2)
 
-        scalar_gaussian = loss.BiVariateGaussian(
+        scalar_gaussian = losses.BiVariateGaussian(
             mu=(mu1_value, mu2_value), sd=(sd1_value, sd2_value), ro=ro_value
         )
         expected_z = (scalar_gaussian.normalized_square(x1_value, mu1_value, sd1_value)
@@ -146,7 +148,7 @@ class BiVariateNormalScalarTests(unittest.TestCase):
         sd1, sd2 = sd
         ro = 0.5
         z = 0
-        gaussian = loss.BiVariateGaussian.from_scalars(mu, sd, ro)
+        gaussian = losses.BiVariateGaussian.from_scalars(mu, sd, ro)
         density = gaussian.compute_density(torch.tensor(z))
         expected = 1.0 / (2 * math.pi * sd1 * sd2 * math.sqrt(1 - ro ** 2))
         self.assertEqual(density, expected)
@@ -157,7 +159,7 @@ class BiVariateNormalScalarTests(unittest.TestCase):
         sd1, sd2 = sd
         ro = 0.5
         z = 3.2
-        gaussian = loss.BiVariateGaussian.from_scalars(mu, sd, ro)
+        gaussian = losses.BiVariateGaussian.from_scalars(mu, sd, ro)
         density = gaussian.compute_density(gaussian.to_tensor(z))
 
         one_minus_ro_squared = 1 - ro ** 2
@@ -171,7 +173,7 @@ class BiVariateNormalScalarTests(unittest.TestCase):
         sd = (2., 3.)
         ro = 0.5
 
-        gaussian = loss.BiVariateGaussian.from_scalars(mu, sd, ro)
+        gaussian = losses.BiVariateGaussian.from_scalars(mu, sd, ro)
         x1, x2 = (-4., -2)
         x1, x2 = gaussian.to_tensor(x1), gaussian.to_tensor(x2)
         density = gaussian.density(x1, x2)
@@ -202,8 +204,8 @@ class BiVariateNormalScalarTests(unittest.TestCase):
         x1 = torch.ones(*shape) * x1_value
         x2 = torch.ones(*shape) * x2_value
 
-        gaussian = loss.BiVariateGaussian(mu, sd, ro)
-        scalar_gaussian = loss.BiVariateGaussian.from_scalars(
+        gaussian = losses.BiVariateGaussian(mu, sd, ro)
+        scalar_gaussian = losses.BiVariateGaussian.from_scalars(
             mu=(mu1_value, mu2_value), sd=(sd1_value, sd2_value), ro=ro_value
         )
 
@@ -223,7 +225,7 @@ class BiVariateNormalScalarTests(unittest.TestCase):
 
         x1 = 3.
         x2 = 4.
-        gaussian = loss.BiVariateGaussian.from_scalars(mu, sd, ro)
+        gaussian = losses.BiVariateGaussian.from_scalars(mu, sd, ro)
         x1, x2 = (gaussian.to_tensor(x1), gaussian.to_tensor(x2))
         density = gaussian.density(x1, x2)
         self.assertEqual(density, 1.0 / (2 * math.pi))
@@ -235,7 +237,7 @@ class MixtureTests(unittest.TestCase):
         mu = torch.tensor([[10, 11, 12, 20, 21, 22]])
         sd = torch.zeros(1, 6)
         ro = torch.zeros(1, 3)
-        mixture = loss.Mixture(pi, mu, sd, ro)
+        mixture = losses.Mixture(pi, mu, sd, ro)
 
         self.assertEqual(mixture.num_components, 3)
 
@@ -244,7 +246,7 @@ class MixtureTests(unittest.TestCase):
         mu = torch.tensor([[10, 11, 12, 20, 21, 22], [1, 2, 3, 101, 102, 103]])
         sd = torch.zeros(2, 6)
         ro = torch.zeros(2, 3)
-        mixture = loss.Mixture(pi, mu, sd, ro)
+        mixture = losses.Mixture(pi, mu, sd, ro)
 
         expected_mu1 = torch.tensor([[10, 11, 12], [1, 2, 3]])
         expected_mu2 = torch.tensor([[20, 21, 22], [101, 102, 103]])
@@ -257,7 +259,7 @@ class MixtureTests(unittest.TestCase):
         mu = torch.zeros(2, 6)
         sd = torch.tensor([[10, 11, 12, 20, 21, 22], [1, 2, 3, 101, 102, 103]])
         ro = torch.zeros(2, 3)
-        mixture = loss.Mixture(pi, mu, sd, ro)
+        mixture = losses.Mixture(pi, mu, sd, ro)
 
         expected_sd1 = torch.tensor([[10, 11, 12], [1, 2, 3]])
         expected_sd2 = torch.tensor([[20, 21, 22], [101, 102, 103]])
@@ -274,12 +276,12 @@ class MixtureTests(unittest.TestCase):
         x1 = torch.tensor([-1], dtype=torch.float64)
         x2 = torch.tensor([1], dtype=torch.float64)
 
-        mixture = loss.Mixture(pi, mu, sd, ro)
+        mixture = losses.Mixture(pi, mu, sd, ro)
 
         density = mixture.log_density(x1, x2)
         self.assertTupleEqual(density.shape, tuple())
 
-        gaussian = loss.BiVariateGaussian.from_scalars(mu=(2., 3.), sd=(3., 4.), ro=0.5)
+        gaussian = losses.BiVariateGaussian.from_scalars(mu=(2., 3.), sd=(3., 4.), ro=0.5)
         d = torch.log(gaussian.density(-1, 1))
         self.assertEqual(density.item(), d.item())
 
@@ -292,13 +294,13 @@ class MixtureTests(unittest.TestCase):
         x1 = torch.tensor([-1], dtype=torch.float64)
         x2 = torch.tensor([1], dtype=torch.float64)
 
-        mixture = loss.Mixture(pi, mu, sd, ro)
+        mixture = losses.Mixture(pi, mu, sd, ro)
 
         density = mixture.log_density(x1, x2)
         self.assertTupleEqual(density.shape, tuple())
 
-        first_component_gaussian = loss.BiVariateGaussian.from_scalars(mu=(2., 3.), sd=(3., 4.), ro=0.5)
-        second_component_gaussian = loss.BiVariateGaussian.from_scalars(mu=(-2., -3.), sd=(-3., -4.), ro=-0.25)
+        first_component_gaussian = losses.BiVariateGaussian.from_scalars(mu=(2., 3.), sd=(3., 4.), ro=0.5)
+        second_component_gaussian = losses.BiVariateGaussian.from_scalars(mu=(-2., -3.), sd=(-3., -4.), ro=-0.25)
 
         mixture_density = (pi[0, 0] * first_component_gaussian.density(-1, 1) +
                            pi[0, 1] * second_component_gaussian.density(-1, 1))
@@ -314,13 +316,13 @@ class MixtureTests(unittest.TestCase):
         x1 = torch.tensor([-1, 3], dtype=torch.float64)
         x2 = torch.tensor([1, 2], dtype=torch.float64)
 
-        mixture = loss.Mixture(pi, mu, sd, ro)
+        mixture = losses.Mixture(pi, mu, sd, ro)
 
         density = mixture.log_density(x1, x2)
         self.assertTupleEqual(density.shape, tuple())
 
-        first_step_gaussian = loss.BiVariateGaussian.from_scalars(mu=(2., -2.), sd=(3., 3.), ro=0.5)
-        second_step_gaussian = loss.BiVariateGaussian.from_scalars(mu=(3., -3.), sd=(4., 4.), ro=-0.25)
+        first_step_gaussian = losses.BiVariateGaussian.from_scalars(mu=(2., -2.), sd=(3., 3.), ro=0.5)
+        second_step_gaussian = losses.BiVariateGaussian.from_scalars(mu=(3., -3.), sd=(4., 4.), ro=-0.25)
 
         expected = (torch.log(first_step_gaussian.density(-1, 1)) +
                     torch.log(second_step_gaussian.density(3, 2)))
@@ -335,16 +337,16 @@ class MixtureTests(unittest.TestCase):
         x1 = torch.tensor([-1, 3], dtype=torch.float64)
         x2 = torch.tensor([1, 2], dtype=torch.float64)
 
-        mixture = loss.Mixture(pi, mu, sd, ro)
+        mixture = losses.Mixture(pi, mu, sd, ro)
 
         density = mixture.log_density(x1, x2)
         self.assertTupleEqual(density.shape, tuple())
 
-        step1_comp1_gaussian = loss.BiVariateGaussian.from_scalars(mu=(2., -2.), sd=(3., 3.), ro=0.5)
-        step1_comp2_gaussian = loss.BiVariateGaussian.from_scalars(mu=(0., 1.), sd=(1., 5.), ro=0.1)
+        step1_comp1_gaussian = losses.BiVariateGaussian.from_scalars(mu=(2., -2.), sd=(3., 3.), ro=0.5)
+        step1_comp2_gaussian = losses.BiVariateGaussian.from_scalars(mu=(0., 1.), sd=(1., 5.), ro=0.1)
 
-        step2_comp1_gaussian = loss.BiVariateGaussian.from_scalars(mu=(3., -3.), sd=(4., 4.), ro=-0.25)
-        step2_comp2_gaussian = loss.BiVariateGaussian.from_scalars(mu=(1., 0.), sd=(2., 6.), ro=0.3)
+        step2_comp1_gaussian = losses.BiVariateGaussian.from_scalars(mu=(3., -3.), sd=(4., 4.), ro=-0.25)
+        step2_comp2_gaussian = losses.BiVariateGaussian.from_scalars(mu=(1., 0.), sd=(2., 6.), ro=0.3)
 
         step1_pi = pi[0]
         step2_pi = pi[1]
@@ -361,6 +363,25 @@ class MixtureTests(unittest.TestCase):
 
 class LossTests(unittest.TestCase):
     def test_loss(self):
-        self.fail('finish')
+        batch_size = 2
+        sequence_size = 2
+        num_components = 3
+
+        pi = torch.tensor([
+            [[0, 0.25, 0.75], [0, 0.5, 0.5]],
+            [[0, 0.5, 0.5], [1, 0., 0.]],
+        ], dtype=torch.float32)
+
+        mu = torch.ones(batch_size, sequence_size, num_components * 2, dtype=torch.float32)
+        sd = torch.ones(batch_size, sequence_size, num_components * 2, dtype=torch.float32)
+        ro = torch.zeros(batch_size, sequence_size, num_components, dtype=torch.float32)
+
+        eos_hat = torch.zeros(batch_size, sequence_size, 1)
+        ground_true = torch.zeros(batch_size, sequence_size, 3).numpy().tolist()
+        ground_true = utils.PaddedSequencesBatch(ground_true)
+        mixtures = (pi, mu, sd, ro)
+        nll_loss = losses.nll_loss(mixtures, eos_hat, ground_true)
+        nll_loss.item()
+
 
 # todo: numerical stability tests
