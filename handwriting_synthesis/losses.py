@@ -28,14 +28,17 @@ class BiVariateGaussian:
         self.sd1, self.sd2 = sd
         self.ro = ro
 
+        self.epsilon = 10**(-8)
+
     def density(self, x1, x2):
         z = self.compute_z(x1, x2)
         return self.compute_density(z)
 
     def compute_density(self, z):
+        eps = self.epsilon
         one_minus_ro_squared = 1 - self.ro ** 2
-        exp = torch.exp(-z / (2 * one_minus_ro_squared))
-        denominator = 2 * math.pi * self.sd1 * self.sd2 * torch.sqrt(1 - self.ro ** 2)
+        exp = torch.exp(-z / (2 * one_minus_ro_squared + eps))
+        denominator = 2 * math.pi * self.sd1 * self.sd2 * torch.sqrt(1 - self.ro ** 2) + eps
         return exp / denominator
 
     def compute_z(self, x1, x2):
@@ -45,10 +48,11 @@ class BiVariateGaussian:
         return first_term + second_term - substraction_term
 
     def normalized_square(self, x, mu, sd):
+        sd = sd + self.epsilon
         return ((x - mu) / sd) ** 2
 
     def substraction_term(self, x1, x2):
-        return 2 * self.ro * (x1 - self.mu1) * (x2 - self.mu2) / (self.sd1 * self.sd2)
+        return 2 * self.ro * (x1 - self.mu1) * (x2 - self.mu2) / (self.sd1 * self.sd2 + self.epsilon)
 
 
 class Mixture:
@@ -92,12 +96,13 @@ class Mixture:
         :param x2: 1D Tensor
         :return: scalar
         """
+        eps = 10**(-16)
         x1 = self._prepare_x(x1)
         x2 = self._prepare_x(x2)
         mu = (self.mu1, self.mu2)
         sd = (self.sd1, self.sd2)
         gaussian = BiVariateGaussian(mu, sd, self.ro)
-        densities = gaussian.density(x1, x2)
+        densities = gaussian.density(x1, x2) + eps
         mixture_densities = (densities * self.pi).sum(dim=1)
         return torch.log(mixture_densities).sum(dim=0)
 

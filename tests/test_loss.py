@@ -7,7 +7,7 @@ from handwriting_synthesis import utils
 
 
 class BiVariateNormalZTests(unittest.TestCase):
-    def test_normalized_square_helper_methods(self):
+    def test_normalized_square_helper_method(self):
         mu = (1., 4.)
         sd = (2., 4.)
         ro = 0.
@@ -17,8 +17,21 @@ class BiVariateNormalZTests(unittest.TestCase):
 
         res = gaussian.normalized_square(x1, mu[0], sd[0])
         expected = ((x1 - mu[0]) / sd[0]) ** 2
-        self.assertEqual(res, expected)
-        self.assertEqual(res, 1.5 ** 2)
+        self.assertAlmostEqual(res, expected, places=6)
+        self.assertAlmostEqual(res, 1.5 ** 2, places=6)
+
+    def test_normalized_square_helper_method_avoids_division_by_zero(self):
+        mu = (1., 4.)
+        sd = (0., 4.)
+        ro = 0.
+
+        x1 = 4.
+        gaussian = losses.BiVariateGaussian(mu, sd, ro)
+
+        res = gaussian.normalized_square(x1, mu[0], sd[0])
+        expected = ((x1 - mu[0]) / (sd[0] + gaussian.epsilon)) ** 2
+        self.assertAlmostEqual(res, expected, places=6)
+        self.assertAlmostEqual(res, (3.0 / gaussian.epsilon) ** 2, places=6)
 
     def test_substraction_term_helper_method(self):
         mu = (1., 4.)
@@ -30,10 +43,23 @@ class BiVariateNormalZTests(unittest.TestCase):
 
         res = gaussian.substraction_term(x1, x2)
         expected = 2 * ro * (x1 - mu[0]) * (x2 - mu[1]) / (sd[0] * sd[1])
-        self.assertEqual(res, expected)
-        self.assertEqual(res, 0.5)
+        self.assertAlmostEqual(res, expected, places=6)
+        self.assertAlmostEqual(res, 0.5, places=6)
 
-    def test_formula_uses_first_term(self):
+    def test_substraction_term_helper_method_avoids_division_by_zero(self):
+        mu = (3., 4.)
+        sd = (0., 0.)
+        ro = 0.5
+
+        x1, x2 = (4., 5.)
+        gaussian = losses.BiVariateGaussian(mu, sd, ro)
+
+        res = gaussian.substraction_term(x1, x2)
+        expected = 2 * ro * (x1 - mu[0]) * (x2 - mu[1]) / (sd[0] * sd[1] + gaussian.epsilon)
+        self.assertAlmostEqual(res, expected, places=6)
+        self.assertAlmostEqual(res, 1.0 / gaussian.epsilon, places=6)
+
+    def test_z_formula_uses_first_term(self):
         mu = (1., 4.)
         sd = (2., 4.)
         ro = 0.
@@ -44,10 +70,10 @@ class BiVariateNormalZTests(unittest.TestCase):
         z = gaussian.compute_z(x1, x2)
 
         expected = 9/4.0
-        self.assertEqual(z, expected)
-        self.assertEqual(z, (x1 - mu[0]) ** 2 / sd[0] ** 2)
+        self.assertAlmostEqual(z, expected, places=6)
+        self.assertAlmostEqual(z, (x1 - mu[0]) ** 2 / sd[0] ** 2, places=6)
 
-    def test_formula_uses_second_term(self):
+    def test_z_formula_uses_second_term(self):
         mu = (4., 4.)
         sd = (2., 4.)
         ro = 0.
@@ -57,10 +83,10 @@ class BiVariateNormalZTests(unittest.TestCase):
         z = gaussian.compute_z(x1, x2)
 
         expected = 9 / 16.
-        self.assertEqual(z, expected)
-        self.assertEqual(z, (x2 - mu[1]) ** 2 / sd[1] ** 2)
+        self.assertAlmostEqual(z, expected, places=6)
+        self.assertAlmostEqual(z, (x2 - mu[1]) ** 2 / sd[1] ** 2, places=6)
 
-    def test_formula_uses_third_term(self):
+    def test_z_formula_uses_third_term(self):
         mu = (2., 4.)
         sd = (2., 3.)
         ro = 1
@@ -70,11 +96,11 @@ class BiVariateNormalZTests(unittest.TestCase):
         z = gaussian.compute_z(x1, x2)
 
         expected = 1 + 1 - (-2)
-        self.assertEqual(z, expected)
+        self.assertAlmostEqual(z, expected, places=6)
         expected = (gaussian.normalized_square(x1, mu[0], sd[0])
                     + gaussian.normalized_square(x2, mu[1], sd[1])
                     - 2 * ro * (x1 - mu[0]) * (x2 - mu[1]) / (sd[0] * sd[1]))
-        self.assertEqual(z, expected)
+        self.assertAlmostEqual(z, expected, places=6)
 
     def test_formula_on_tensors(self):
         mu1 = torch.tensor([2., 5.])
@@ -149,9 +175,9 @@ class BiVariateNormalScalarTests(unittest.TestCase):
         ro = 0.5
         z = 0
         gaussian = losses.BiVariateGaussian.from_scalars(mu, sd, ro)
-        density = gaussian.compute_density(torch.tensor(z))
+        density = gaussian.compute_density(torch.tensor(z)).item()
         expected = 1.0 / (2 * math.pi * sd1 * sd2 * math.sqrt(1 - ro ** 2))
-        self.assertEqual(density, expected)
+        self.assertAlmostEqual(density, expected, places=6)
 
     def test_compute_density_formula_correct(self):
         mu = (3., 4.)
@@ -165,6 +191,21 @@ class BiVariateNormalScalarTests(unittest.TestCase):
         one_minus_ro_squared = 1 - ro ** 2
         exp = math.exp(-z / (2 * one_minus_ro_squared))
         denominator = (2 * math.pi * sd1 * sd2 * math.sqrt(1 - ro ** 2))
+        expected = exp / denominator
+        self.assertAlmostEqual(density.item(), expected, places=8)
+
+    def test_density_formula_avoids_division_by_zero(self):
+        mu = (3., 4.)
+        sd = (2., 3.)
+        sd1, sd2 = sd
+        ro = 1
+        z = 3.2
+        gaussian = losses.BiVariateGaussian.from_scalars(mu, sd, ro)
+        density = gaussian.compute_density(gaussian.to_tensor(z))
+
+        one_minus_ro_squared = 1 - ro ** 2
+        exp = math.exp(-z / (2 * one_minus_ro_squared + gaussian.epsilon))
+        denominator = (2 * math.pi * sd1 * sd2 * math.sqrt(1 - ro ** 2)) + gaussian.epsilon
         expected = exp / denominator
         self.assertAlmostEqual(density.item(), expected, places=8)
 
@@ -227,8 +268,8 @@ class BiVariateNormalScalarTests(unittest.TestCase):
         x2 = 4.
         gaussian = losses.BiVariateGaussian.from_scalars(mu, sd, ro)
         x1, x2 = (gaussian.to_tensor(x1), gaussian.to_tensor(x2))
-        density = gaussian.density(x1, x2)
-        self.assertEqual(density, 1.0 / (2 * math.pi))
+        density = gaussian.density(x1, x2).item()
+        self.assertAlmostEqual(density, 1.0 / (2 * math.pi), places=6)
 
 
 class MixtureTests(unittest.TestCase):
@@ -283,7 +324,7 @@ class MixtureTests(unittest.TestCase):
 
         gaussian = losses.BiVariateGaussian.from_scalars(mu=(2., 3.), sd=(3., 4.), ro=0.5)
         d = torch.log(gaussian.density(-1, 1))
-        self.assertEqual(density.item(), d.item())
+        self.assertAlmostEqual(density.item(), d.item(), places=6)
 
     def test_2_component_mixture_density_for_a_single_step(self):
         pi = torch.tensor([[0.2, 0.8]], dtype=torch.float64)
@@ -305,7 +346,7 @@ class MixtureTests(unittest.TestCase):
         mixture_density = (pi[0, 0] * first_component_gaussian.density(-1, 1) +
                            pi[0, 1] * second_component_gaussian.density(-1, 1))
         expected = torch.log(mixture_density).item()
-        self.assertEqual(density.item(), expected)
+        self.assertAlmostEqual(density.item(), expected, places=6)
 
     def test_1_component_mixture_density_for_2_steps_sequence(self):
         pi = torch.tensor([[1], [1]], dtype=torch.float64)
@@ -326,7 +367,7 @@ class MixtureTests(unittest.TestCase):
 
         expected = (torch.log(first_step_gaussian.density(-1, 1)) +
                     torch.log(second_step_gaussian.density(3, 2)))
-        self.assertEqual(density.item(), expected.item())
+        self.assertAlmostEqual(density.item(), expected.item(), places=6)
 
     def test_2_component_mixture_density_for_2_steps_sequence(self):
         pi = torch.tensor([[0.2, 0.8], [0.6, 0.4]], dtype=torch.float64)
@@ -358,7 +399,7 @@ class MixtureTests(unittest.TestCase):
                          step2_pi[1] * step2_comp2_gaussian.density(3, 2))
 
         expected = torch.log(step1_density) + torch.log(step2_density)
-        self.assertEqual(density, expected)
+        self.assertAlmostEqual(density.item(), expected.item(), places=6)
 
 
 class LossTests(unittest.TestCase):

@@ -1,3 +1,4 @@
+import math
 import unittest
 
 from handwriting_synthesis import training
@@ -44,9 +45,10 @@ class TrainingLoopTests(unittest.TestCase):
         loop.set_training_task(task)
         loop.start(epochs=2)
 
+        expected_loss = dummy_loss / math.log2(math.e)
         expected = [
-            f"\rEpoch {0:4} finished. Loss   23.32.",
-            f"\rEpoch {0:4} finished. Loss   23.32."
+            f"\rEpoch {0:4} finished. Loss {expected_loss:7.2f} nats.",
+            f"\rEpoch {0:4} finished. Loss {expected_loss:7.2f} nats."
         ]
         self.assertIn(expected[0], output_device.lines[0])
 
