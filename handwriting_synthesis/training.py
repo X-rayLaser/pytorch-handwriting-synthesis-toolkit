@@ -45,16 +45,29 @@ class TrainingLoop:
         num_batches = math.ceil(len(self._dataset) / self._batch_size)
 
         iteration = 0
-        loss = 0
+        from .metrics import MovingAverage
+
+        ma_loss = MovingAverage()
+
         for epoch in range(epochs):
+            ma_loss.reset()
+
             for i, data in enumerate(loader):
                 y_hat, loss = self._trainer.train(data)
                 self._run_iteration_callbacks(epoch, i, iteration)
-                self._output_device.write(f'\rEpoch {epoch:4} {i + 1}/{num_batches} batches. Loss {loss:7.2f}', end='')
+
+                with torch.no_grad():
+                    ma_loss.update(loss)
+
+                nats_loss = ma_loss.nats
+                self._output_device.write(
+                    f'\rEpoch {epoch:4} {i + 1}/{num_batches} batches. Loss {nats_loss:7.2f} nats',
+                    end=''
+                )
                 iteration += 1
                 yield
 
-            s = self._format_epoch_info(epoch, loss)
+            s = self._format_epoch_info(epoch, ma_loss.nats)
 
             self._run_epoch_callbacks(epoch)
             self._output_device.write(f'\r{s}', end='\n')
@@ -71,7 +84,7 @@ class TrainingLoop:
                 cb.on_epoch(epoch)
 
     def _format_epoch_info(self, epoch, loss):
-        return f'Epoch {epoch:4} finished. Loss {loss:7.2f}.'
+        return f'Epoch {epoch:4} finished. Loss {loss:7.2f} nats.'
 
     def set_training_task(self, task):
         self._trainer = task
@@ -97,8 +110,10 @@ class DummyTask(TrainingTask):
 
 
 class HandwritingPredictionTrainingTask(TrainingTask):
-    def __init__(self):
-        self._model = models.HandwritingPredictionNetwork(3, 900, 20)
+    def __init__(self, device):
+        self._device = device
+        self._model = models.HandwritingPredictionNetwork(3, 900, 20, device)
+        self._model.to(self._device)
         #self._optimizer = torch.optim.Adam(self._model.parameters(), lr=0.001)
         self._optimizer = CustomRMSprop(
             self._model.parameters(), lr=0.0001, alpha=0.95, eps=10 ** (-4),
@@ -106,6 +121,7 @@ class HandwritingPredictionTrainingTask(TrainingTask):
         )
 
     def train(self, batch):
+        # todo: use moving average to print average loss/metric
         # todo: split data and save them into h5 file formats
         # todo: write dataset that can read raw data from h5 files and preprocess them
         # todo: write metrics code
@@ -119,6 +135,7 @@ class HandwritingPredictionTrainingTask(TrainingTask):
         prefix = torch.zeros(batch_size, 1, input_dim)
         x = torch.cat([prefix, ground_true.tensor[:, :-1]], dim=1)
 
+        x.to(self._device)
         y_hat = self._model(x)
         mixtures, eos_hat = y_hat
 

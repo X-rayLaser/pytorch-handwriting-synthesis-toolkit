@@ -1,3 +1,4 @@
+import math
 import torch.nn
 
 
@@ -11,6 +12,10 @@ class MovingAverage:
         if self._iterations == 0:
             return 0
         return self._value / self._iterations
+
+    @property
+    def nats(self):
+        return self.value / math.log2(math.e)
 
     def update(self, v):
         self._value += v
