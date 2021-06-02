@@ -356,15 +356,18 @@ class MixtureDensityLayer(nn.Module):
 
 
 class HandwritingPredictionNetwork(nn.Module):
-    def __init__(self, input_size, hidden_size, num_components):
+    def __init__(self, input_size, hidden_size, num_components, device=None):
         super().__init__()
         self.input_size = input_size
         self.lstm = PeepholeLSTM(input_size, hidden_size)
-        self.mixture_density = MixtureDensityLayer(hidden_size, num_components)
+        self.output_layer = MixtureDensityLayer(hidden_size, num_components)
 
         self._lstm_state = None
+        if device is None:
+            device = torch.device("cpu")
+        self.device = device
 
-    def get_initial_input(self, batch_size=1):
+    def get_initial_input(self, batch_size):
         return torch.zeros(batch_size, 1, self.input_size, device=self.device)
 
     def forward(self, x):
@@ -374,12 +377,12 @@ class HandwritingPredictionNetwork(nn.Module):
             self._lstm_state = self.lstm.get_initial_state(batch_size)
 
         x, _ = self.lstm(x, states=self._lstm_state)
-        pi, mu, sd, ro, eos = self.mixture_density(x)
+        pi, mu, sd, ro, eos = self.output_layer(x)
         return (pi, mu, sd, ro), eos
 
     def sample_means(self, context=None, steps=700, stochastic=False):
-        x = self.get_initial_input()
-        hidden = self.get_initial_states()
+        x = self.get_initial_input(batch_size=1)
+        hidden = self.lstm.get_initial_state(batch_size=1)
 
         points = torch.zeros(steps, 3, dtype=torch.float32, device=self.device)
 

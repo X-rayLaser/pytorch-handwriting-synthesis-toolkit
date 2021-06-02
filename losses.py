@@ -116,6 +116,7 @@ def nll_loss(mixture, eos_hat, ground_true):
     """
     y = ground_true.concatenated()
     pi, mu, sd, ro = mixture
+    batch_size = len(pi)
 
     num_components = pi.shape[-1]
     mu1 = mu[:, :, :num_components]
@@ -140,12 +141,11 @@ def nll_loss(mixture, eos_hat, ground_true):
     eos = y[:, 2]
 
     eos_hat = ground_true.concatenate_batch(eos_hat)
-    #eos_hat = eos_hat[:, 0]
+    eos_hat = eos_hat[:, 0]
 
     gaussian_mixture = Mixture(pi, mu, sd, ro)
     density = gaussian_mixture.log_density(y1, y2)
 
     binary_log_likelihood = (eos * torch.log(eos_hat) + (1 - eos) * torch.log(1 - eos_hat)).sum()
 
-    batch_size = len(eos)
     return -(density + binary_log_likelihood) / batch_size
