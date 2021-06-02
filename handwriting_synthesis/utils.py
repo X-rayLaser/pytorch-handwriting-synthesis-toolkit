@@ -14,7 +14,7 @@ class BatchAdapter:
 
 
 class PaddedSequencesBatch:
-    def __init__(self, sequences, padding=0):
+    def __init__(self, sequences, device=None, padding=0):
         """
 
         :param sequences: List[List[Tuple]]
@@ -22,6 +22,9 @@ class PaddedSequencesBatch:
         """
         if not sequences or not sequences[0]:
             raise BadInputError()
+
+        if device is None:
+            device = torch.device("cpu")
 
         self._seqs = sequences
 
@@ -32,7 +35,7 @@ class PaddedSequencesBatch:
         self._batch_size = len(sequences)
 
         self._tensor = torch.ones(
-            self._batch_size, self._max_len, self._inner_dim, dtype=torch.float32
+            self._batch_size, self._max_len, self._inner_dim, dtype=torch.float32, device=device
         ) * padding
 
         mask = []
@@ -44,7 +47,7 @@ class PaddedSequencesBatch:
             for j in range(seq_len):
                 self._tensor[i, j] = torch.tensor(sequences[i][j])
 
-        self._mask = torch.tensor(mask, dtype=torch.bool)
+        self._mask = torch.tensor(mask, dtype=torch.bool, device=device)
 
     @property
     def max_length(self):

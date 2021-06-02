@@ -374,7 +374,8 @@ class HandwritingPredictionNetwork(nn.Module):
         batch_size = len(x)
 
         if self._lstm_state is None or self._lstm_state[0].shape[0] != batch_size:
-            self._lstm_state = self.lstm.get_initial_state(batch_size)
+            h0, c0 = self.lstm.get_initial_state(batch_size)
+            self._lstm_state = (h0.to(self.device), c0.to(self.device))
 
         x, _ = self.lstm(x, states=self._lstm_state)
         pi, mu, sd, ro, eos = self.output_layer(x)
@@ -382,7 +383,8 @@ class HandwritingPredictionNetwork(nn.Module):
 
     def sample_means(self, context=None, steps=700, stochastic=False):
         x = self.get_initial_input(batch_size=1)
-        hidden = self.lstm.get_initial_state(batch_size=1)
+        h0, c0 = self.lstm.get_initial_state(batch_size=1)
+        hidden = (h0.to(self.device), c0.to(self.device))
 
         points = torch.zeros(steps, 3, dtype=torch.float32, device=self.device)
 

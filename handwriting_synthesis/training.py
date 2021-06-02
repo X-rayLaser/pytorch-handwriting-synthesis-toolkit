@@ -128,14 +128,13 @@ class HandwritingPredictionTrainingTask(TrainingTask):
 
         self._optimizer.zero_grad()
         points, transcriptions = batch
-        ground_true = utils.PaddedSequencesBatch(points)
+        ground_true = utils.PaddedSequencesBatch(points, device=self._device)
 
         batch_size, steps, input_dim = ground_true.tensor.shape
 
-        prefix = torch.zeros(batch_size, 1, input_dim)
+        prefix = torch.zeros(batch_size, 1, input_dim, device=self._device)
         x = torch.cat([prefix, ground_true.tensor[:, :-1]], dim=1)
 
-        x.to(self._device)
         y_hat = self._model(x)
         mixtures, eos_hat = y_hat
 

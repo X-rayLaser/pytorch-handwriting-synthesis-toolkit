@@ -104,7 +104,7 @@ class Mixture:
         gaussian = BiVariateGaussian(mu, sd, self.ro)
         densities = gaussian.density(x1, x2) + eps
         mixture_densities = (densities * self.pi).sum(dim=1)
-        return torch.log(mixture_densities).sum(dim=0)
+        return torch.log(mixture_densities + eps).sum(dim=0)
 
     def _prepare_x(self, x):
         return x.unsqueeze(1).repeat(1, self.num_components)
@@ -151,6 +151,7 @@ def nll_loss(mixture, eos_hat, ground_true):
     gaussian_mixture = Mixture(pi, mu, sd, ro)
     density = gaussian_mixture.log_density(y1, y2)
 
-    binary_log_likelihood = (eos * torch.log(eos_hat) + (1 - eos) * torch.log(1 - eos_hat)).sum()
+    eps = 10 ** (-8)
+    binary_log_likelihood = (eos * torch.log(eos_hat + eps) + (1 - eos) * torch.log(1 - eos_hat + eps)).sum()
 
     return -(density + binary_log_likelihood) / batch_size

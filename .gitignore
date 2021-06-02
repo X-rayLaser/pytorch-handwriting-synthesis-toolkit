@@ -4,4 +4,5 @@ venv/
 *.png
 *.jpg
 *.log
+*.zip
 iam_ondb/
