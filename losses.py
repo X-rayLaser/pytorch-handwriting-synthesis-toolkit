@@ -139,6 +139,9 @@ def nll_loss(mixture, eos_hat, ground_true):
     y2 = y[:, 1]
     eos = y[:, 2]
 
+    eos_hat = ground_true.concatenate_batch(eos_hat)
+    #eos_hat = eos_hat[:, 0]
+
     gaussian_mixture = Mixture(pi, mu, sd, ro)
     density = gaussian_mixture.log_density(y1, y2)
 

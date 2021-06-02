@@ -358,9 +358,62 @@ class MixtureDensityLayer(nn.Module):
 class HandwritingPredictionNetwork(nn.Module):
     def __init__(self, input_size, hidden_size, num_components):
         super().__init__()
+        self.input_size = input_size
+        self.lstm = PeepholeLSTM(input_size, hidden_size)
+        self.mixture_density = MixtureDensityLayer(hidden_size, num_components)
+
+        self._lstm_state = None
+
+    def get_initial_input(self, batch_size=1):
+        return torch.zeros(batch_size, 1, self.input_size, device=self.device)
 
     def forward(self, x):
-        pass
+        batch_size = len(x)
+
+        if self._lstm_state is None or self._lstm_state[0].shape[0] != batch_size:
+            self._lstm_state = self.lstm.get_initial_state(batch_size)
+
+        x, _ = self.lstm(x, states=self._lstm_state)
+        pi, mu, sd, ro, eos = self.mixture_density(x)
+        return (pi, mu, sd, ro), eos
+
+    def sample_means(self, context=None, steps=700, stochastic=False):
+        x = self.get_initial_input()
+        hidden = self.get_initial_states()
+
+        points = torch.zeros(steps, 3, dtype=torch.float32, device=self.device)
+
+        for t in range(steps):
+            v, hidden = self.lstm(x, hidden)
+            output = self.output_layer(v)
+            output = self.unsqueeze(output)
+            point = self.get_mean_prediction(output, stochastic=stochastic)
+            points[t] = point
+            x = point.reshape(1, 1, 3)
+
+        return points
+
+    def unsqueeze(self, t):
+        pi, mu, sd, ro, eos = t
+        return pi[0, 0], mu[0, 0], sd[0, 0], ro[0, 0], eos[0, 0]
+
+    def get_mean_prediction(self, output, stochastic=False):
+        pi, mu, sd, ro, eos = output
+        num_components = len(pi)
+        if stochastic:
+            component = torch.multinomial(pi, 1).item()
+        else:
+            component = pi.cpu().argmax()
+        mu1 = mu[component]
+        mu2 = mu[component + num_components]
+
+        if eos > 0.5:
+            eos_flag = 1
+        else:
+            eos_flag = 0
+
+        return torch.tensor([mu1, mu2, eos_flag], device=self.device)
+
 
 
 def expand_dims(shape):

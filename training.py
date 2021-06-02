@@ -7,6 +7,15 @@ import losses
 import models
 
 
+def collate(batch):
+    x = []
+    y = []
+    for points, text in batch:
+        x.append(points)
+        y.append(text)
+    return x, y
+
+
 class TrainingLoop:
     def __init__(self, dataset, batch_size, training_task=None):
         self._dataset = dataset
@@ -25,15 +34,16 @@ class TrainingLoop:
             pass
 
     def get_iterator(self, epochs):
-        loader = DataLoader(self._dataset, self._batch_size)
+        loader = DataLoader(self._dataset, self._batch_size, collate_fn=collate)
         num_batches = math.ceil(len(self._dataset) / self._batch_size)
 
         iteration = 0
+        loss = 0
         for epoch in range(epochs):
             for i, data in enumerate(loader):
                 y_hat, loss = self._trainer.train(data)
                 self._run_iteration_callbacks(epoch, i, iteration)
-                self._output_device.write(f'\rEpoch {epoch:4} {i + 1}/{num_batches} batches.', end='')
+                self._output_device.write(f'\rEpoch {epoch:4} {i + 1}/{num_batches} batches. Loss {loss:7.2f}', end='')
                 iteration += 1
                 yield
 
@@ -79,9 +89,20 @@ class DummyTask(TrainingTask):
 
 class HandwritingPredictionTrainingTask(TrainingTask):
     def __init__(self):
+        from optimizers import CustomRMSprop
         self._model = models.HandwritingPredictionNetwork(3, 900, 20)
+        #self._optimizer = torch.optim.Adam(self._model.parameters(), lr=0.001)
+        self._optimizer = CustomRMSprop(
+            self._model.parameters(), lr=0.0001, alpha=0.95, eps=10 ** (-4),
+            momentum=9000, centered=True
+        )
 
     def train(self, batch):
+        # todo: split data and save them into h5 file formats
+        # todo: write dataset that can read raw data from h5 files and preprocess them
+        # todo: write metrics code
+
+        self._optimizer.zero_grad()
         points, transcriptions = batch
         ground_true = utils.PaddedSequencesBatch(points)
 
@@ -90,15 +111,16 @@ class HandwritingPredictionTrainingTask(TrainingTask):
         prefix = torch.zeros(batch_size, 1, input_dim)
         x = torch.cat([prefix, ground_true.tensor[:, :-1]], dim=1)
 
-        state = self._model.get_initial_state(batch_size)
-        y_hat = self._model(x, state)
+        y_hat = self._model(x)
         mixtures, eos_hat = y_hat
 
         y_hat = (mixtures, eos_hat)
         loss = losses.nll_loss(mixtures, eos_hat, ground_true)
 
         loss.backward()
-        loss.step()
+        #model.clip_gradient()
+        self._optimizer.step()
+
         return y_hat, loss
 
 
@@ -164,3 +186,41 @@ class IterationModelCheckpoint(Callback):
         if (iteration + 1) % self._save_interval == 0:
             save_path = os.path.join(self._save_dir, f'model_at_epoch_{iteration + 1}.pt')
             torch.save(self._model.state_dict(), save_path)
+
+
+class HandwritingGenerationCallback(Callback):
+    def __init__(self, model, samples_dir, max_length, train_set, iteration_interval=10):
+        self.model = model
+        self.samples_dir = samples_dir
+        self.max_length = max_length
+        self.interval = iteration_interval
+        self.train_set = train_set
+
+    def on_iteration(self, epoch, epoch_iteration, iteration):
+        if (iteration + 1) % self.interval == 0:
+            steps = self.max_length
+
+            greedy_dir = os.path.join(self.samples_dir, 'greedy')
+            random_dir = os.path.join(self.samples_dir, 'random')
+
+            os.makedirs(greedy_dir, exist_ok=True)
+            os.makedirs(random_dir, exist_ok=True)
+
+            file_name = f'iteration_{iteration}.png'
+            greedy_path = os.path.join(greedy_dir, file_name)
+            random_path = os.path.join(random_dir, file_name)
+
+            with torch.no_grad():
+                self.generate_handwriting(greedy_path, steps=steps, stochastic=False)
+                self.generate_handwriting(random_path, steps=steps, stochastic=True)
+
+    def generate_handwriting(self, save_path, steps, stochastic=True):
+        from utils import visualize_strokes
+        try:
+            sampled_handwriting = self.model.sample_means(steps=steps, stochastic=stochastic)
+            sampled_handwriting = sampled_handwriting.cpu()
+            sampled_handwriting = self.train_set.denormalize(sampled_handwriting)
+            visualize_strokes(sampled_handwriting, save_path, lines=True)
+        except Exception:
+            import traceback
+            traceback.print_exc()

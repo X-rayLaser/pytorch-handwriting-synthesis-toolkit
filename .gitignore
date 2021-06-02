@@ -3,3 +3,5 @@ venv/
 *.pyc
 *.png
 *.jpg
+*.log
+iam_ondb/

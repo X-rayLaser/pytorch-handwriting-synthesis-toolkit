@@ -60,7 +60,7 @@ class PaddedSequencesBatchTests(unittest.TestCase):
         self.assertTupleEqual(tensor.shape, expected_tensor.shape)
         self.assertTrue(torch.allclose(tensor, expected_tensor))
 
-    def test_concatenate_batch_must_be_of_the_same_shape_as_tensor(self):
+    def test_concatenate_batch_must_be_of_the_same_shape_as_tensor_except_last_dimension(self):
         batch = torch.zeros(3, 2, 1)
         self.assertRaises(Exception, lambda: self.few_seqs_batch.concatenate_batch(batch))
 
@@ -68,7 +68,7 @@ class PaddedSequencesBatchTests(unittest.TestCase):
         self.assertRaises(Exception, lambda: self.few_seqs_batch.concatenate_batch(batch))
 
         batch = torch.zeros(3, 3, 2)
-        self.assertRaises(Exception, lambda: self.few_seqs_batch.concatenate_batch(batch))
+        self.few_seqs_batch.concatenate_batch(batch)
 
     def test_concatenate_batch(self):
         batch = torch.tensor([
