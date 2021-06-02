@@ -1,6 +1,6 @@
 import unittest
 import torch
-import utils
+from handwriting_synthesis import utils
 
 
 class PaddedSequencesBatchTests(unittest.TestCase):

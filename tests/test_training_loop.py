@@ -1,6 +1,6 @@
 import unittest
 
-import training
+from handwriting_synthesis import training
 
 
 class TrainingLoopTests(unittest.TestCase):

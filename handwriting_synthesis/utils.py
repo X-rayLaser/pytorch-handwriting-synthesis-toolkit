@@ -115,7 +115,6 @@ def visualize_strokes(seq, save_path='img.png', lines=False):
     height = int(y_with_offset.max() + 10)
 
     if width * height > 8000 * 2000:
-        print('Too large image. Skip.')
         return
 
     im = Image.new(mode='L', size=(width, height))

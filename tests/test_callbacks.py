@@ -4,7 +4,7 @@ import unittest
 
 import torch
 
-import training
+from handwriting_synthesis import training
 
 
 class CallbackTests(unittest.TestCase):

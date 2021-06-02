@@ -4,8 +4,8 @@ import numpy as np
 import torch
 from torch.nn import functional as F
 
-import lstm_test_utils
-import models
+from handwriting_synthesis import lstm_test_utils
+from handwriting_synthesis import models
 
 
 class FormulasTests(unittest.TestCase):

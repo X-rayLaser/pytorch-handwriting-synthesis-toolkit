@@ -2,9 +2,11 @@ import math
 import os
 import torch.nn.functional
 from torch.utils.data.dataloader import DataLoader
-import utils
-import losses
-import models
+from handwriting_synthesis import utils
+from handwriting_synthesis import losses
+from handwriting_synthesis import models
+from handwriting_synthesis.optimizers import CustomRMSprop
+from handwriting_synthesis.utils import visualize_strokes
 
 
 def collate(batch):
@@ -17,7 +19,7 @@ def collate(batch):
 
 
 class TrainingLoop:
-    def __init__(self, dataset, batch_size, training_task=None):
+    def __init__(self, dataset, batch_size, training_task=None, device=None):
         self._dataset = dataset
         self._output_device = ConsoleDevice()
         self._batch_size = batch_size
@@ -26,6 +28,11 @@ class TrainingLoop:
             self._trainer = TrainingTask()
         else:
             self._trainer = training_task
+
+        if device is None:
+            device = torch.device("cpu")
+
+        self._device = device
         self._callbacks = []
 
     def start(self, epochs):
@@ -54,12 +61,14 @@ class TrainingLoop:
             yield
 
     def _run_iteration_callbacks(self, epoch, epoch_iteration, iteration):
-        for cb in self._callbacks:
-            cb.on_iteration(epoch, epoch_iteration, iteration)
+        with torch.no_grad():
+            for cb in self._callbacks:
+                cb.on_iteration(epoch, epoch_iteration, iteration)
 
     def _run_epoch_callbacks(self, epoch):
-        for cb in self._callbacks:
-            cb.on_epoch(epoch)
+        with torch.no_grad():
+            for cb in self._callbacks:
+                cb.on_epoch(epoch)
 
     def _format_epoch_info(self, epoch, loss):
         return f'Epoch {epoch:4} finished. Loss {loss:7.2f}.'
@@ -89,7 +98,6 @@ class DummyTask(TrainingTask):
 
 class HandwritingPredictionTrainingTask(TrainingTask):
     def __init__(self):
-        from optimizers import CustomRMSprop
         self._model = models.HandwritingPredictionNetwork(3, 900, 20)
         #self._optimizer = torch.optim.Adam(self._model.parameters(), lr=0.001)
         self._optimizer = CustomRMSprop(
@@ -215,7 +223,6 @@ class HandwritingGenerationCallback(Callback):
                 self.generate_handwriting(random_path, steps=steps, stochastic=True)
 
     def generate_handwriting(self, save_path, steps, stochastic=True):
-        from utils import visualize_strokes
         try:
             sampled_handwriting = self.model.sample_means(steps=steps, stochastic=stochastic)
             sampled_handwriting = sampled_handwriting.cpu()

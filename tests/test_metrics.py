@@ -2,8 +2,8 @@ import unittest
 
 import torch
 
-import metrics
-import training
+from handwriting_synthesis import metrics
+from handwriting_synthesis import training
 
 
 class MetricTests(unittest.TestCase):

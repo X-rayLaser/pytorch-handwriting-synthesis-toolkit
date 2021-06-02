@@ -1,9 +1,9 @@
 import unittest
 import torch
-import losses
+from handwriting_synthesis import losses
 import math
 
-import utils
+from handwriting_synthesis import utils
 
 
 class BiVariateNormalZTests(unittest.TestCase):
