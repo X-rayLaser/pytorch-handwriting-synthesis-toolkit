@@ -2,11 +2,10 @@ import math
 import os
 import torch.nn.functional
 from torch.utils.data.dataloader import DataLoader
-from handwriting_synthesis import utils
-from handwriting_synthesis import losses
-from handwriting_synthesis import models
-from handwriting_synthesis.optimizers import CustomRMSprop
-from handwriting_synthesis.utils import visualize_strokes
+from . import utils, losses, models
+from .optimizers import CustomRMSprop
+from .utils import visualize_strokes
+from .metrics import MovingAverage
 
 
 def collate(batch):
@@ -19,7 +18,7 @@ def collate(batch):
 
 
 class TrainingLoop:
-    def __init__(self, dataset, batch_size, training_task=None, device=None):
+    def __init__(self, dataset, batch_size, training_task=None):
         self._dataset = dataset
         self._output_device = ConsoleDevice()
         self._batch_size = batch_size
@@ -29,10 +28,6 @@ class TrainingLoop:
         else:
             self._trainer = training_task
 
-        if device is None:
-            device = torch.device("cpu")
-
-        self._device = device
         self._callbacks = []
 
     def start(self, epochs):
@@ -45,7 +40,6 @@ class TrainingLoop:
         num_batches = math.ceil(len(self._dataset) / self._batch_size)
 
         iteration = 0
-        from .metrics import MovingAverage
 
         ma_loss = MovingAverage()
 

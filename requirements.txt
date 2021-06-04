@@ -4,3 +4,4 @@ torch
 matplotlib
 torchvision
 requests
+h5py
