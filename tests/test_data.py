@@ -1,4 +1,7 @@
 import unittest
+
+import numpy as np
+
 from handwriting_synthesis import data
 from handwriting_synthesis.data import points_stream, flatten_strokes, BadStrokeSequenceError
 import shutil
@@ -190,6 +193,48 @@ class H5Tests(unittest.TestCase):
         self.assertTupleEqual(example1, h5_dataset[0])
         self.assertTupleEqual(example2, h5_dataset[1])
 
+    def test_mu_and_std_for_1_sequence(self):
+        seq = [[0., 0., 0.], [2., 4., 0.], [-1., 1., 1.]]
+
+        text1 = 'string 1'
+
+        dataset = [(seq, text1)]
+
+        data.save_to_h5(dataset, self.h5_path, max_length=5)
+
+        expected_mu = (1 / 3., 5 / 3., 0)
+        std_array = np.array(seq).std(axis=0)
+        expected_std = (std_array[0], std_array[1], 1.)
+
+        h5_dataset = data.H5Dataset(self.h5_path)
+
+        self.assertEqual(expected_mu, h5_dataset.mu)
+        self.assertEqual(expected_std, h5_dataset.std)
+
+    def test_mu_and_2_sequences(self):
+        seq1 = [[0., 0., 0.], [2., 4., 0.], [-1., 1., 1.]]
+        seq2 = [[0., 0., 0.], [-2., 1., 1.]]
+        flatten = []
+        flatten.extend(seq1)
+        flatten.extend(seq2)
+
+        text1 = 'string 1'
+        text2 = 'string 2'
+
+        example1 = (seq1, text1)
+        example2 = (seq2, text2)
+        dataset = [example1, example2]
+
+        data.save_to_h5(dataset, self.h5_path, max_length=5)
+
+        expected_mu = (- 1 / 5., 6 / 5., 0)
+        std_array = np.array(flatten).std(axis=0)
+        expected_std = (std_array[0], std_array[1], 1.)
+
+        h5_dataset = data.H5Dataset(self.h5_path)
+
+        self.assertEqual(expected_mu, h5_dataset.mu)
+        self.assertEqual(expected_std, h5_dataset.std)
 
     #def test_point_stream_on_empty_list(self):
     #    self.assertRaises(BadStrokeSequenceError, lambda: list(points_stream([])))

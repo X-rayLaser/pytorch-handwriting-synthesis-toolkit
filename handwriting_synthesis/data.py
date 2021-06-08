@@ -102,31 +102,60 @@ class H5Dataset(torch.utils.data.Dataset):
     def __init__(self, path):
         super().__init__()
         self._path = path
+        self._fd = h5py.File(self._path, 'r')
+        ds_lengths = self._fd['lengths']
+        self._num_examples = len(ds_lengths)
 
-        with h5py.File(self._path, 'r') as f:
-            ds_lengths = f['lengths']
-            self._num_examples = len(ds_lengths)
+    def close(self):
+        self._fd.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        print(f'{exc_type}, {exc_val}\n{exc_tb}')
+        self.close()
 
     def __len__(self):
         return self._num_examples
 
     def __getitem__(self, item):
-        return load_from_h5(self._path, item)
+        return load_from_h5(self._fd, item)
+
+    @property
+    def mu(self):
+        # todo: replace with memory efficient implementation
+        sequences = self._get_all_points()
+        means = np.mean(sequences, axis=0)
+        return means[0], means[1], 0.
+
+    @property
+    def std(self):
+        # todo: replace with memory efficient implementation
+        sequences = self._get_all_points()
+        stds = np.std(sequences, axis=0)
+        return stds[0], stds[1], 1.
+
+    def _get_all_points(self):
+        sequences = []
+        for i in range(len(self)):
+            seq, _ = self[i]
+            sequences.extend(seq)
+        return sequences
 
 
-def load_from_h5(path, index):
-    with h5py.File(path, 'r') as f:
-        ds_sequences = f['sequences']
-        ds_lengths = f['lengths']
-        ds_texts = f['texts']
+def load_from_h5(fd, index):
+    ds_sequences = fd['sequences']
+    ds_lengths = fd['lengths']
+    ds_texts = fd['texts']
 
-        sequence_length = ds_lengths[index]
-        sequence = ds_sequences[index][:sequence_length]
-        text = ds_texts[index]
+    sequence_length = ds_lengths[index]
+    sequence = ds_sequences[index][:sequence_length]
+    text = ds_texts[index]
 
-        sequence = sequence[:, :].tolist()
-        text = text.decode(encoding='utf-8')
-        return sequence, text
+    sequence = sequence[:, :].tolist()
+    text = text.decode(encoding='utf-8')
+    return sequence, text
 
 
 def preprocess_data(data_provider, max_length):
