@@ -63,7 +63,7 @@ if __name__ == '__main__':
     val_save_path = os.path.join(save_dir, 'val.h5')
     os.makedirs(save_dir, exist_ok=True)
 
-    factory = IAMonDBProviderFactory('../iam_ondb_home', num_examples, max_len)
+    factory = IAMonDBProviderFactory('../iam_ondb_home', num_examples)
     train_provider = factory.train_data_provider
     data.build_dataset(train_provider, train_save_path, max_len)
 

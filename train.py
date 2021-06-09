@@ -25,10 +25,12 @@ if __name__ == '__main__':
 
     with data.NormalizedDataset('datasets/train.h5', mu, sd) as train_set, \
             data.NormalizedDataset('datasets/val.h5', mu, sd) as val_set:
-        num_examples = len(train_set)
+        num_train_examples = len(train_set)
+        num_val_examples = len(val_set)
         max_length = train_set.max_length
 
-        print(f'Training handwriting prediction model: dataset size {num_examples}, '
+        print(f'Training handwriting prediction model: training set size {num_train_examples}, '
+              f'validation set size {num_val_examples}, '
               f'batch size {batch_size}, '
               f'max sequence length {max_length}')
 
