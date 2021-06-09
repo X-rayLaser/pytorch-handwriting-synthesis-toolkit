@@ -174,6 +174,8 @@ class H5Tests(unittest.TestCase):
         self.assertEqual(points, restored_dataset)
         self.assertEqual('Hello, world', restored_text)
 
+        self.assertEqual(5, h5_dataset.max_length)
+
     def test_save_and_load_2_sequences(self):
         seq1 = [[0., 0., 0.], [2., 4., 0.], [-1., 1., 1.]]
         seq2 = [[0., 0., 0.], [-2., 1., 1.]]

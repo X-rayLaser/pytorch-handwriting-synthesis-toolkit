@@ -1,4 +1,5 @@
 venv/
+datasets/
 \.idea/
 *.pyc
 *.png

@@ -81,6 +81,7 @@ def save_to_h5(data, save_path, max_length):
         ds_sequences = f.create_dataset('sequences', (0, max_length, 3), maxshape=(None, max_length, 3))
         ds_lengths = f.create_dataset('lengths', (0,), maxshape=(None,), dtype='i2')
         ds_texts = f.create_dataset('texts', (0,), maxshape=(None,), dtype=dt)
+        ds_sequences.attrs['max_length'] = max_length
 
         for i, (points, text) in enumerate(data):
             a = np.array(points, dtype=np.float16)
@@ -106,6 +107,11 @@ class H5Dataset(torch.utils.data.Dataset):
         ds_lengths = self._fd['lengths']
         self._num_examples = len(ds_lengths)
 
+    @property
+    def max_length(self):
+        ds_sequences = self._fd['sequences']
+        return ds_sequences.attrs['max_length']
+
     def close(self):
         self._fd.close()
 
@@ -113,7 +119,8 @@ class H5Dataset(torch.utils.data.Dataset):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        print(f'{exc_type}, {exc_val}\n{exc_tb}')
+        if exc_type or exc_val or exc_tb:
+            print(f'{exc_type}, {exc_val}\n{exc_tb}')
         self.close()
 
     def __len__(self):
@@ -144,7 +151,39 @@ class H5Dataset(torch.utils.data.Dataset):
         return sequences
 
 
+class NormalizedDataset(H5Dataset):
+    def __init__(self, path, mu, sd):
+        super().__init__(path)
+        self._mu = mu
+        self._sd = sd
+
+    def __getitem__(self, index):
+        points, text = super().__getitem__(index)
+        tensor = torch.tensor(points)
+        item = self.normalize(tensor)
+        return item.numpy().tolist(), text
+
+    @property
+    def mu(self):
+        return self._mu
+
+    @property
+    def std(self):
+        return self._sd
+
+    def normalize(self, tensor):
+        mu = torch.tensor(self._mu)
+        sd = torch.tensor(self._sd)
+        return (tensor - mu) / sd
+
+    def denormalize(self, tensor):
+        mu = torch.tensor(self._mu)
+        sd = torch.tensor(self._sd)
+        return tensor * sd + mu
+
+
 def load_from_h5(fd, index):
+    # todo: return sequence as tensor
     ds_sequences = fd['sequences']
     ds_lengths = fd['lengths']
     ds_texts = fd['texts']
