@@ -179,6 +179,7 @@ class HandwritingSynthesisTask(HandwritingPredictionTrainingTask):
 
     def get_extra_input(self, transcriptions):
         tensor = transcriptions_to_tensor(transcriptions)
+        tensor = tensor.to(device=self._device)
         return (tensor,)
 
 

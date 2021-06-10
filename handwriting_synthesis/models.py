@@ -120,7 +120,7 @@ class SoftWindow(jit.ScriptModule):
         alpha = alpha.unsqueeze(2).repeat(1, 1, char_seq_size)
         beta = beta.unsqueeze(2).repeat(1, 1, char_seq_size)
         k = k.unsqueeze(2).repeat(1, 1, char_seq_size)
-        u = torch.arange(char_seq_size)
+        u = torch.arange(char_seq_size, device=alpha.device)
 
         densities = alpha * torch.exp(-beta * (k - u) ** 2)
         phi = densities.sum(dim=1).unsqueeze(1)
@@ -294,7 +294,7 @@ class SynthesisNetwork(jit.ScriptModule):
         return self.unsqueeze(mixtures)
 
     def sample_means(self, context=None, steps=700, stochastic=False):
-        c = context
+        c = context.to(self.device)
         batch_size, u, _ = c.shape
         assert batch_size == 1
         x = self.get_initial_input().unsqueeze(0)
