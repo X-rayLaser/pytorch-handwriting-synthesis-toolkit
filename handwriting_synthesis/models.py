@@ -185,77 +185,70 @@ class SynthesisNetwork(jit.ScriptModule):
         self.device = device
         self.gaussian_components = gaussian_components
 
-        self.lstm1 = BatchLessLSTM(input_size + alphabet_size, hidden_size)
+        self.lstm1 = PeepholeLSTM(input_size + alphabet_size, hidden_size)
         self.window = SoftWindow(hidden_size, gaussian_components)
-        self.lstm2 = BatchLessLSTM(input_size + hidden_size + alphabet_size, hidden_size)
-        self.lstm3 = BatchLessLSTM(input_size + hidden_size + alphabet_size, hidden_size)
-        self.mixture = BatchLessMixture(hidden_size * 3, output_mixtures)
-
-        self.hidden1, self.hidden2, self.hidden3 = self.get_all_initial_states()
-        self.initial_window = self.get_initial_window()
-        self.initial_k = torch.zeros(self.gaussian_components, device=self.device, dtype=torch.float32)
+        self.lstm2 = PeepholeLSTM(input_size + hidden_size + alphabet_size, hidden_size)
+        self.lstm3 = PeepholeLSTM(input_size + hidden_size + alphabet_size, hidden_size)
+        self.mixture = MixtureDensityLayer(hidden_size * 3, output_mixtures)
 
     @jit.script_method
     def forward(self, x: Tensor, c: Tensor):
         batch_size, steps, _ = x.shape
-
-        x = x[0]
-        c = c[0]
-
-        h1, w1 = self.compute_windows(x, c, self.hidden1)
-        mixture, _, _ = self.compute_mixture(x, h1, w1, self.hidden2, self.hidden3)
-        return self.unsqueeze(mixture)
+        hidden1, hidden2, hidden3 = self.get_all_initial_states(batch_size)
+        h1, w1 = self.compute_windows(x, c, hidden1)
+        (pi, mu, sd, ro, eos), _, _ = self.compute_mixture(x, h1, w1, hidden2, hidden3)
+        return (pi, mu, sd, ro), eos
 
     @jit.script_method
     def compute_windows(self, x: Tensor, c: Tensor, hidden1: Tuple[Tensor, Tensor]):
-        steps, _ = x.shape
-        w_t = self.initial_window
-        k = self.initial_k
+        batch_size, steps, _ = x.shape
+        w_t = self.get_initial_window(batch_size)
+        k = torch.zeros(batch_size, self.gaussian_components, device=self.device, dtype=torch.float32)
 
         h1 = []
         w1 = []
 
         for t in range(steps):
-            x_t = x[t:t + 1, :]
-            x_with_w = torch.cat([x_t, w_t], dim=1)
+            x_t = x[:, t:t + 1, :]
+            x_with_w = torch.cat([x_t, w_t], dim=-1)
             h_t, hidden1 = self.lstm1(x_with_w, hidden1)
             w_t, k = self.window(h_t, c, k)
 
             h1.append(h_t)
             w1.append(w_t)
 
-        h = torch.cat(h1, dim=0)
-        w = torch.cat(w1, dim=0)
+        h = torch.cat(h1, dim=1)
+        w = torch.cat(w1, dim=1)
         return h, w
 
     @jit.script_method
     def compute_mixture(self, x: Tensor, h1: Tensor, w1: Tensor, hidden2: Tuple[Tensor, Tensor], hidden3: Tuple[Tensor, Tensor]):
-        inputs = torch.cat([x, h1, w1], dim=1)
+        inputs = torch.cat([x, h1, w1], dim=-1)
         h2, hidden2 = self.lstm2(inputs, hidden2)
 
-        inputs = torch.cat([x, h2, w1], dim=1)
+        inputs = torch.cat([x, h2, w1], dim=-1)
         h3, hidden3 = self.lstm3(inputs, hidden3)
 
-        inputs = torch.cat([h1, h2, h3], dim=1)
+        inputs = torch.cat([h1, h2, h3], dim=-1)
 
         return self.mixture(inputs), hidden2, hidden3
 
-    def get_initial_states(self):
-        h0 = torch.zeros(self.hidden_size, device=self.device)
+    def get_initial_states(self, batch_size: int):
+        h0 = torch.zeros(batch_size, self.hidden_size, device=self.device)
         c0 = torch.zeros_like(h0)
         return h0, c0
 
-    def get_all_initial_states(self):
-        hidden1 = self.get_initial_states()
-        hidden2 = self.get_initial_states()
-        hidden3 = self.get_initial_states()
+    def get_all_initial_states(self, batch_size: int):
+        hidden1 = self.get_initial_states(batch_size)
+        hidden2 = self.get_initial_states(batch_size)
+        hidden3 = self.get_initial_states(batch_size)
         return hidden1, hidden2, hidden3
 
     def get_initial_input(self):
         return torch.zeros(1, 3, device=self.device)
 
-    def get_initial_window(self):
-        return torch.zeros(1, self.alphabet_size, device=self.device)
+    def get_initial_window(self, batch_size: int):
+        return torch.zeros(batch_size, 1, self.alphabet_size, device=self.device)
 
     def forward_without_tf(self, x, c):
         steps = x.shape[1]
@@ -304,31 +297,30 @@ class SynthesisNetwork(jit.ScriptModule):
         c = context
         batch_size, u, _ = c.shape
         assert batch_size == 1
-        c = c[0]
-        x = self.get_initial_input()
-        w = self.get_initial_window()
-        k = torch.zeros(self.gaussian_components, device=self.device, dtype=torch.float32)
+        x = self.get_initial_input().unsqueeze(0)
+        w = self.get_initial_window(batch_size)
+        k = torch.zeros(batch_size, self.gaussian_components, device=self.device, dtype=torch.float32)
 
-        hidden1, hidden2, hidden3 = self.get_all_initial_states()
+        hidden1, hidden2, hidden3 = self.get_all_initial_states(batch_size)
 
         outputs = []
         for t in range(steps):
-            x_with_w = torch.cat([x, w], dim=1)
+            x_with_w = torch.cat([x, w], dim=-1)
             h1, hidden1 = self.lstm1(x_with_w, hidden1)
 
             w, k = self.window(h1, c, k)
 
             mixture, hidden2, hidden3 = self.compute_mixture(x, h1, w, hidden2, hidden3)
             mixture = self.squeeze(mixture)
-            x = self.get_mean_prediction(mixture, stochastic=stochastic)
-            x = x.unsqueeze(0)
-            outputs.append(x)
+            x_temp = self.get_mean_prediction(mixture, stochastic=stochastic).unsqueeze(0)
+            outputs.append(x_temp)
+            x = x_temp.unsqueeze(0)
 
         return torch.cat(outputs, dim=0)
 
     def squeeze(self, mixture: Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]):
         pi, mu, sd, ro, eos = mixture
-        return pi[0], mu[0], sd[0], ro[0], eos[0]
+        return pi[0, 0], mu[0, 0], sd[0, 0], ro[0, 0], eos[0, 0]
 
     def unsqueeze(self, mixture: Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]):
         pi, mu, sd, ro, eos = mixture

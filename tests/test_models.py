@@ -435,27 +435,43 @@ class SoftWindowTests(unittest.TestCase):
 
 
 class SynthesisNetworkTests(unittest.TestCase):
-    def test_result_shape(self):
-        batch_size = 16
-        x_steps = 80
-        char_seq_size = 20
+    def setUp(self):
+        self.batch_size = 16
+        self.x_steps = 80
+        self.char_seq_size = 20
 
-        input_size = 3
-        hidden_size = 100
-        alphabet_size = 50
+        self.input_size = 3
+        self.hidden_size = 100
+        self.alphabet_size = 50
         device = torch.device("cpu")
-        gaussian_components = 10
-        output_mixtures = 20
+        self.gaussian_components = 10
+        self.output_mixtures = 20
 
-        model = models.SynthesisNetwork(
-            input_size, hidden_size, alphabet_size, device,
-            gaussian_components, output_mixtures
+        self.model = models.SynthesisNetwork(
+            self.input_size, self.hidden_size, self.alphabet_size, device,
+            self.gaussian_components, self.output_mixtures
         )
 
-        x = torch.zeros(batch_size, x_steps, input_size)
-        c = torch.ones(batch_size, char_seq_size, alphabet_size)
-        pi, mu, sd, ro = model(x, c)
+    def test_result_shape(self):
+        x = torch.zeros(self.batch_size, self.x_steps, self.input_size)
+        c = torch.ones(self.batch_size, self.char_seq_size, self.alphabet_size)
+        (pi, mu, sd, ro), eos = self.model(x, c)
 
+        expected_pi_shape = (self.batch_size, self.x_steps, self.output_mixtures)
+        expected_mu_shape = (self.batch_size, self.x_steps, self.output_mixtures * 2)
+        expected_eos_shape = (self.batch_size, self.x_steps, 1)
+
+        self.assertTupleEqual(expected_pi_shape, pi.shape)
+        self.assertTupleEqual(expected_mu_shape, mu.shape)
+        self.assertTupleEqual(expected_mu_shape, sd.shape)
+        self.assertTupleEqual(expected_pi_shape, ro.shape)
+        self.assertTupleEqual(expected_eos_shape, eos.shape)
+
+    def test_sample_means_result_shape(self):
+        c = torch.ones(1, self.char_seq_size, self.alphabet_size)
+        steps = 100
+        outputs = self.model.sample_means(c, steps=steps)
+        self.assertTupleEqual((100, 3), outputs.shape)
 
 
 # todo: test synthesis network

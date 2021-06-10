@@ -1,3 +1,4 @@
+from collections import defaultdict
 import h5py
 import numpy as np
 import torch.utils.data
@@ -208,6 +209,38 @@ def preprocess_data(data_provider, max_length):
 def build_dataset(data_provider, save_path, max_length):
     generator = preprocess_data(data_provider, max_length)
     save_to_h5(generator, save_path, max_length)
+
+
+class Tokenizer:
+    def __init__(self):
+        self.chr_to_int = defaultdict(int)
+        self.int_to_chr = {}
+
+        for code in range(ord('A'), ord('Z') + 1):
+            token = 1 + code - ord('A')
+            ch = chr(code)
+            self.chr_to_int[ch] = token
+            self.int_to_chr[token] = ch
+
+        for code in range(ord('a'), ord('z') + 1):
+            token = 1 + ord('Z') - ord('A') + 1 + code - ord('a')
+            ch = chr(code)
+            self.chr_to_int[ch] = token
+            self.int_to_chr[token] = ch
+
+        self.chr_to_int[' '] = 53
+        self.int_to_chr[53] = ' '
+
+    @property
+    def size(self):
+        num_special_characters = 1
+        return len(self.chr_to_int) + num_special_characters
+
+    def tokenize(self, s):
+        return [self.chr_to_int[ch] for ch in s]
+
+    def detokenize(self, tokens):
+        return ''.join([self.int_to_chr.get(token, '<Unknown_token>') for token in tokens])
 
 
 class BadStrokeSequenceError(Exception):

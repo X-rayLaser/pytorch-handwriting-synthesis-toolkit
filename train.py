@@ -4,6 +4,60 @@ from handwriting_synthesis import training
 from handwriting_synthesis import data
 
 
+class ConfigOptions:
+    def __init__(self, batch_size, epochs, sampling_interval,
+                 num_train_examples, num_val_examples, max_length):
+        self.batch_size = batch_size
+        self.epochs = epochs
+        self.sampling_interval = sampling_interval
+        self.num_train_examples = num_train_examples
+        self.num_val_examples = num_val_examples
+        self.max_length = max_length
+
+
+def print_info_message(training_task_verbose, config):
+    print(f'{training_task_verbose} with options: training set size {config.num_train_examples}, '
+          f'validation set size {config.num_val_examples}, '
+          f'batch size {config.batch_size}, '
+          f'max sequence length {config.max_length},'
+          f'sampling interval (in # epochs): {config.sampling_interval}')
+
+
+def train_model(train_set, val_set, train_task, callbacks, config, training_task_verbose):
+    print_info_message(training_task_verbose, config)
+
+    loop = training.TrainingLoop(train_set, batch_size=config.batch_size, training_task=train_task)
+
+    for cb in callbacks:
+        loop.add_callback(cb)
+    loop.start(config.epochs)
+
+
+def train_unconditional_handwriting_generator(train_set, val_set, config):
+    train_task = training.HandwritingPredictionTrainingTask(device)
+
+    cb = training.HandwritingGenerationCallback(
+        train_task._model, 'samples', max_length,
+        train_set, iteration_interval=config.sampling_interval
+    )
+
+    train_model(train_set, val_set, train_task, [cb], config,
+                training_task_verbose='Training handwriting prediction model')
+
+
+def train_handwriting_synthesis_model(train_set, val_set, config):
+    train_task = training.HandwritingSynthesisTask(device)
+
+    cb = training.HandwritingSynthesisCallback(
+        10,
+        train_task._model, 'synthesized', max_length,
+        train_set, iteration_interval=config.sampling_interval
+    )
+
+    train_model(train_set, val_set, train_task, [cb], config,
+                training_task_verbose='Training handwriting prediction model')
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
@@ -15,9 +69,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    batch_size = args.batch_size
-    epochs = args.epochs
-    sampling_interval = args.interval
 
     with data.H5Dataset('datasets/train.h5') as dataset:
         mu = dataset.mu
@@ -29,18 +80,11 @@ if __name__ == '__main__':
         num_val_examples = len(val_set)
         max_length = train_set.max_length
 
-        print(f'Training handwriting prediction model: training set size {num_train_examples}, '
-              f'validation set size {num_val_examples}, '
-              f'batch size {batch_size}, '
-              f'max sequence length {max_length}')
+        config = ConfigOptions(args.batch_size, args.epochs, args.interval,
+                               num_train_examples, num_val_examples, max_length)
 
-        train_task = training.HandwritingPredictionTrainingTask(device)
-        loop = training.TrainingLoop(train_set, batch_size=batch_size, training_task=train_task)
-
-        cb = training.HandwritingGenerationCallback(
-            train_task._model, 'samples', max_length,
-            train_set, iteration_interval=sampling_interval
-        )
-
-        loop.add_callback(cb)
-        loop.start(epochs)
+        unconditional = False
+        if unconditional:
+            train_unconditional_handwriting_generator(train_set, val_set, config)
+        else:
+            train_handwriting_synthesis_model(train_set, val_set, config)

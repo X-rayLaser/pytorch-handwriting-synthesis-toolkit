@@ -241,3 +241,14 @@ class H5Tests(unittest.TestCase):
     #def test_point_stream_on_empty_list(self):
     #    self.assertRaises(BadStrokeSequenceError, lambda: list(points_stream([])))
     #    self.assertRaises(BadStrokeSequenceError, lambda: list(points_stream([[], []])))
+
+
+class TokenizerTests(unittest.TestCase):
+    def test(self):
+        tokenizer = data.Tokenizer()
+        s = 'Hello world'
+        tokens = tokenizer.tokenize(s)
+        self.assertEqual(len(s), len(tokens))
+
+        reconstructed = tokenizer.detokenize(tokens)
+        self.assertEqual(s, reconstructed)

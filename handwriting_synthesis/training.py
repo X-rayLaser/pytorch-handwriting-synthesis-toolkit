@@ -1,8 +1,10 @@
 import math
+import re
 import os
+import traceback
 import torch.nn.functional
 from torch.utils.data.dataloader import DataLoader
-from . import utils, losses, models
+from . import utils, losses, models, data
 from .optimizers import CustomRMSprop
 from .utils import visualize_strokes
 from .metrics import MovingAverage
@@ -133,48 +135,51 @@ class BaseHandwritingTask(TrainingTask):
         return y_hat, loss
 
     def get_model(self, device):
-        raise NotImplemented
+        raise NotImplementedError
 
     def prepare_batch(self, batch):
-        raise NotImplemented
+        points, transcriptions = batch
+        ground_true = utils.PaddedSequencesBatch(points, device=self._device)
+
+        batch_size, steps, input_dim = ground_true.tensor.shape
+
+        prefix = torch.zeros(batch_size, 1, input_dim, device=self._device)
+        x = torch.cat([prefix, ground_true.tensor[:, :-1]], dim=1)
+        inputs = (x,) + self.get_extra_input(transcriptions)
+
+        return inputs, ground_true
+
+    def get_extra_input(self, transcriptions):
+        return tuple()
 
 
 class HandwritingPredictionTrainingTask(BaseHandwritingTask):
     def get_model(self, device):
         return models.HandwritingPredictionNetwork(3, 900, 20, device)
 
-    def prepare_batch(self, batch):
-        points, transcriptions = batch
-        ground_true = utils.PaddedSequencesBatch(points, device=self._device)
 
-        batch_size, steps, input_dim = ground_true.tensor.shape
+def transcriptions_to_tensor(transcriptions):
+    tokenizer = data.Tokenizer()
 
-        prefix = torch.zeros(batch_size, 1, input_dim, device=self._device)
-        x = torch.cat([prefix, ground_true.tensor[:, :-1]], dim=1)
-        inputs = (x,)
-        return inputs, ground_true
+    eye = torch.eye(tokenizer.size)
+
+    token_sequences = []
+    for s in transcriptions:
+        tokens = tokenizer.tokenize(s)
+        token_sequences.append(eye[tokens].numpy().tolist())
+
+    batch = utils.PaddedSequencesBatch(token_sequences)
+    return batch.tensor
 
 
 class HandwritingSynthesisTask(HandwritingPredictionTrainingTask):
     def get_model(self, device):
-        return models.SynthesisNetwork(3, 900, 20, device)
+        alphabet_size = data.Tokenizer().size
+        return models.SynthesisNetwork(3, 400, alphabet_size, device)
 
-    def prepare_batch(self, batch):
-        points, transcriptions = batch
-        ground_true = utils.PaddedSequencesBatch(points, device=self._device)
-
-        batch_size, steps, input_dim = ground_true.tensor.shape
-
-        prefix = torch.zeros(batch_size, 1, input_dim, device=self._device)
-        x = torch.cat([prefix, ground_true.tensor[:, :-1]], dim=1)
-
-        c = self._transcriptions_to_tensor(transcriptions)
-
-        inputs = (x, c)
-        return inputs, ground_true
-
-    def _transcriptions_to_tensor(self, transcriptions):
-        raise NotImplemented
+    def get_extra_input(self, transcriptions):
+        tensor = transcriptions_to_tensor(transcriptions)
+        return (tensor,)
 
 
 class OutputDevice:
@@ -259,20 +264,52 @@ class HandwritingGenerationCallback(Callback):
             os.makedirs(greedy_dir, exist_ok=True)
             os.makedirs(random_dir, exist_ok=True)
 
-            file_name = f'iteration_{iteration}.png'
-            greedy_path = os.path.join(greedy_dir, file_name)
-            random_path = os.path.join(random_dir, file_name)
+            names_with_contexts = self.get_names_with_contexts(iteration)
 
-            with torch.no_grad():
-                self.generate_handwriting(greedy_path, steps=steps, stochastic=False)
-                self.generate_handwriting(random_path, steps=steps, stochastic=True)
+            if len(names_with_contexts) > 1:
+                greedy_dir = os.path.join(greedy_dir, str(iteration))
+                random_dir = os.path.join(random_dir, str(iteration))
+                os.makedirs(greedy_dir, exist_ok=True)
+                os.makedirs(random_dir, exist_ok=True)
 
-    def generate_handwriting(self, save_path, steps, stochastic=True):
+            for file_name, context in names_with_contexts:
+                greedy_path = os.path.join(greedy_dir, file_name)
+                random_path = os.path.join(random_dir, file_name)
+
+                with torch.no_grad():
+                    self.generate_handwriting(greedy_path, steps=steps, stochastic=False, context=context)
+                    self.generate_handwriting(random_path, steps=steps, stochastic=True, context=context)
+
+    def get_names_with_contexts(self, iteration):
+        file_name = f'iteration_{iteration}.png'
+        context = None
+        return [(file_name, context)]
+
+    def generate_handwriting(self, save_path, steps, stochastic=True, context=None):
         try:
-            sampled_handwriting = self.model.sample_means(steps=steps, stochastic=stochastic)
+            sampled_handwriting = self.model.sample_means(steps=steps, stochastic=stochastic, context=context)
             sampled_handwriting = sampled_handwriting.cpu()
             sampled_handwriting = self.train_set.denormalize(sampled_handwriting)
             visualize_strokes(sampled_handwriting, save_path, lines=True)
         except Exception:
-            import traceback
             traceback.print_exc()
+
+
+class HandwritingSynthesisCallback(HandwritingGenerationCallback):
+    def __init__(self, images_per_iterations=10, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.images_per_iteration = images_per_iterations
+
+    def get_names_with_contexts(self, iteration):
+        images_per_iteration = min(len(self.train_set), self.images_per_iteration)
+        res = []
+        for i in range(images_per_iteration):
+            _, transcription = self.train_set[i]
+            transcription_batch = [transcription]
+
+            name = re.sub('[^0-9a-zA-Z]+', '_', transcription)
+            file_name = f'{name}.png'
+            context = transcriptions_to_tensor(transcription_batch)
+            res.append((file_name, context))
+
+        return res
