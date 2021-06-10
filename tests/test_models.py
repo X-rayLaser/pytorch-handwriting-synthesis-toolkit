@@ -361,3 +361,103 @@ class MixtureDensityLayerTests(unittest.TestCase):
         self.assertTrue(torch.allclose(expected_sd, sd))
         self.assertTrue(torch.allclose(expected_ro, ro))
         self.assertTrue(torch.allclose(expected_eos, eos))
+
+
+class SoftWindowTests(unittest.TestCase):
+    def test_shape(self):
+        batch_size = 4
+        input_size = 10
+        num_components = 20
+        num_chars = 30
+        alphabet_size = 50
+        window = models.SoftWindow(input_size, num_components)
+
+        x = torch.zeros(batch_size, 1, input_size)
+        prev_k = torch.zeros(batch_size, num_components)
+        c = torch.zeros(batch_size, num_chars, alphabet_size)
+        w, k = window(x, c, prev_k)
+
+        self.assertTupleEqual((batch_size, 1, alphabet_size), w.shape)
+        self.assertTupleEqual((batch_size, num_components), k.shape)
+
+    def test_computes_attention_weights_correctly_on_batch_size_of_1(self):
+        input_size = 3
+        num_components = 2
+        seq_size = 4
+        window = models.SoftWindow(input_size, num_components)
+
+        alpha = torch.tensor([[2.3, 0.8], [3., 2.5]])
+        beta = torch.tensor([[3., 2.], [1., 3.]])
+        k = torch.tensor([[4.1, 3.1], [2.4, 3.2]])
+
+        actual_phi = window.compute_attention_weights(alpha, beta, k, seq_size)
+
+        alpha = alpha.squeeze(0)
+        beta = beta.squeeze(0)
+        k = k.squeeze(0)
+
+        densities = []
+        for u in range(seq_size):
+            t = alpha[0] * torch.exp(-beta[0] * (k[0] - u) ** 2)
+            densities.append(t.unsqueeze(0))
+
+        phi1 = torch.cat(densities, dim=0).sum(dim=1)
+
+        densities = []
+        for u in range(seq_size):
+            t = alpha[1] * torch.exp(-beta[1] * (k[1] - u) ** 2)
+            densities.append(t.unsqueeze(0))
+        phi2 = torch.cat(densities, dim=0).sum(dim=1)
+
+        expected_phi = torch.cat([phi1.unsqueeze(0), phi2.unsqueeze(0)]).unsqueeze(1)
+
+        self.assertEqual(expected_phi.shape, actual_phi.shape)
+        self.assertTrue(torch.allclose(actual_phi, expected_phi))
+
+    def test_matmul_3d(self):
+        phi1 = torch.tensor([1., 2, 3]).unsqueeze(0)
+        phi2 = torch.tensor([4., 5, 6]).unsqueeze(0)
+
+        phi = torch.cat([phi1, phi2], dim=0).unsqueeze(1)
+
+        self.assertTupleEqual((2, 1, 3), phi.shape)
+
+        c = torch.ones(2, 3, 5, dtype=torch.float32)
+
+        res = models.SoftWindow.matmul_3d(phi, c)
+        expected1 = torch.matmul(phi1, c[0])
+        expected2 = torch.matmul(phi2, c[1])
+        expected = torch.cat([expected1, expected2], dim=0).unsqueeze(1)
+
+        self.assertEqual((2, 1, 5), res.shape)
+
+        self.assertTrue(torch.allclose(res, expected, 0.001))
+
+
+class SynthesisNetworkTests(unittest.TestCase):
+    def test_result_shape(self):
+        batch_size = 16
+        x_steps = 80
+        char_seq_size = 20
+
+        input_size = 3
+        hidden_size = 100
+        alphabet_size = 50
+        device = torch.device("cpu")
+        gaussian_components = 10
+        output_mixtures = 20
+
+        model = models.SynthesisNetwork(
+            input_size, hidden_size, alphabet_size, device,
+            gaussian_components, output_mixtures
+        )
+
+        x = torch.zeros(batch_size, x_steps, input_size)
+        c = torch.ones(batch_size, char_seq_size, alphabet_size)
+        pi, mu, sd, ro = model(x, c)
+
+
+
+# todo: test synthesis network
+# todo: training task for training synthesis network
+# todo: callback to synthesize new example

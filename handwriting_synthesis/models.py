@@ -89,27 +89,46 @@ class SoftWindow(jit.ScriptModule):
     @jit.script_method
     def forward(self, x: Tensor, c: Tensor, prev_k: Tensor):
         """
-        :param x: tensor of shape (1, input_size)
-        :param c: tensor of shape (num_characters, alphabet_size)
-        :param prev_k: tensor of shape (num_components,)
-        :return: window of shape (1, alphabet_size), k of shape (num_components,)
+        :param x: tensor of shape (batch_size, 1, input_size)
+        :param c: tensor of shape (batch_size, num_characters, alphabet_size)
+        :param prev_k: tensor of shape (batch_size, num_components)
+        :return: window of shape (batch_size, 1, alphabet_size), k of shape (batch_size, num_components)
         """
 
-        x = x[0]
+        x = x[:, 0]
 
         alpha = torch.exp(self.alpha(x))
         beta = torch.exp(self.beta(x))
-        k = prev_k + torch.exp(self.k(x))
+        k_new = prev_k + torch.exp(self.k(x))
 
-        num_chars, _ = c.shape
-        densities = []
-        for u in range(num_chars):
-            t = alpha * torch.exp(-beta * (k - u) ** 2)
-            densities.append(t.unsqueeze(0))
+        batch_size, num_chars, _ = c.shape
+        phi = self.compute_attention_weights(alpha, beta, k_new, num_chars)
+        w = self.matmul_3d(phi, c)
+        return w, k_new
 
-        phi = torch.cat(densities, dim=0).sum(dim=1)
-        w = torch.matmul(phi, c).unsqueeze(0)
-        return w, k
+        # remove this
+        #densities = []
+        #for u in range(num_chars):
+        #    t = alpha * torch.exp(-beta * (k - u) ** 2)
+        #    densities.append(t.unsqueeze(0))
+
+        #phi = torch.cat(densities, dim=0).sum(dim=1)
+        #w = torch.matmul(phi, c).unsqueeze(0)
+        #return w, k
+
+    def compute_attention_weights(self, alpha, beta, k, char_seq_size: int):
+        alpha = alpha.unsqueeze(2).repeat(1, 1, char_seq_size)
+        beta = beta.unsqueeze(2).repeat(1, 1, char_seq_size)
+        k = k.unsqueeze(2).repeat(1, 1, char_seq_size)
+        u = torch.arange(char_seq_size)
+
+        densities = alpha * torch.exp(-beta * (k - u) ** 2)
+        phi = densities.sum(dim=1).unsqueeze(1)
+        return phi
+
+    @staticmethod
+    def matmul_3d(phi, c):
+        return torch.bmm(phi, c)
 
 
 class BatchLessLSTM(nn.Module):
@@ -179,8 +198,6 @@ class SynthesisNetwork(jit.ScriptModule):
     @jit.script_method
     def forward(self, x: Tensor, c: Tensor):
         batch_size, steps, _ = x.shape
-        assert batch_size == 1
-        assert c.shape[0] == 1
 
         x = x[0]
         c = c[0]

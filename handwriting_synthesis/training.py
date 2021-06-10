@@ -103,10 +103,10 @@ class DummyTask(TrainingTask):
         return batch, self._loss
 
 
-class HandwritingPredictionTrainingTask(TrainingTask):
+class BaseHandwritingTask(TrainingTask):
     def __init__(self, device):
         self._device = device
-        self._model = models.HandwritingPredictionNetwork(3, 900, 20, device)
+        self._model = self.get_model(device)
         self._model.to(self._device)
         #self._optimizer = torch.optim.Adam(self._model.parameters(), lr=0.001)
         self._optimizer = CustomRMSprop(
@@ -115,21 +115,12 @@ class HandwritingPredictionTrainingTask(TrainingTask):
         )
 
     def train(self, batch):
-        # todo: use moving average to print average loss/metric
-        # todo: split data and save them into h5 file formats
-        # todo: write dataset that can read raw data from h5 files and preprocess them
         # todo: write metrics code
 
         self._optimizer.zero_grad()
-        points, transcriptions = batch
-        ground_true = utils.PaddedSequencesBatch(points, device=self._device)
+        inputs, ground_true = self.prepare_batch(batch)
 
-        batch_size, steps, input_dim = ground_true.tensor.shape
-
-        prefix = torch.zeros(batch_size, 1, input_dim, device=self._device)
-        x = torch.cat([prefix, ground_true.tensor[:, :-1]], dim=1)
-
-        y_hat = self._model(x)
+        y_hat = self._model(*inputs)
         mixtures, eos_hat = y_hat
 
         y_hat = (mixtures, eos_hat)
@@ -140,6 +131,50 @@ class HandwritingPredictionTrainingTask(TrainingTask):
         self._optimizer.step()
 
         return y_hat, loss
+
+    def get_model(self, device):
+        raise NotImplemented
+
+    def prepare_batch(self, batch):
+        raise NotImplemented
+
+
+class HandwritingPredictionTrainingTask(BaseHandwritingTask):
+    def get_model(self, device):
+        return models.HandwritingPredictionNetwork(3, 900, 20, device)
+
+    def prepare_batch(self, batch):
+        points, transcriptions = batch
+        ground_true = utils.PaddedSequencesBatch(points, device=self._device)
+
+        batch_size, steps, input_dim = ground_true.tensor.shape
+
+        prefix = torch.zeros(batch_size, 1, input_dim, device=self._device)
+        x = torch.cat([prefix, ground_true.tensor[:, :-1]], dim=1)
+        inputs = (x,)
+        return inputs, ground_true
+
+
+class HandwritingSynthesisTask(HandwritingPredictionTrainingTask):
+    def get_model(self, device):
+        return models.SynthesisNetwork(3, 900, 20, device)
+
+    def prepare_batch(self, batch):
+        points, transcriptions = batch
+        ground_true = utils.PaddedSequencesBatch(points, device=self._device)
+
+        batch_size, steps, input_dim = ground_true.tensor.shape
+
+        prefix = torch.zeros(batch_size, 1, input_dim, device=self._device)
+        x = torch.cat([prefix, ground_true.tensor[:, :-1]], dim=1)
+
+        c = self._transcriptions_to_tensor(transcriptions)
+
+        inputs = (x, c)
+        return inputs, ground_true
+
+    def _transcriptions_to_tensor(self, transcriptions):
+        raise NotImplemented
 
 
 class OutputDevice:
