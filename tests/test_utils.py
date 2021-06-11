@@ -83,3 +83,18 @@ class PaddedSequencesBatchTests(unittest.TestCase):
         tensor = self.few_seqs_batch.concatenate_batch(batch)
         self.assertTupleEqual(expected_tensor.shape, tensor.shape)
         self.assertTrue(torch.allclose(expected_tensor, tensor))
+
+
+class VisualizationTests(unittest.TestCase):
+    def test(self):
+        from prepare_data import IAMonDBProviderFactory
+        from handwriting_synthesis import data
+
+        factory = IAMonDBProviderFactory('../../iam_ondb_home', 2)
+        provider = factory.train_data_provider
+        examples = list(provider)
+        strokes, transcription = examples[0]
+        print(data.flatten_strokes(strokes))
+        tensor = torch.tensor(data.flatten_strokes(strokes))
+        utils.visualize_strokes(tensor,  lines=True)
+        #self.fail('')

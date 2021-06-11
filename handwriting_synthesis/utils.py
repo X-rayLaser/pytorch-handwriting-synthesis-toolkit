@@ -160,7 +160,11 @@ def load_saved_weights(model, check_points_dir='check_points'):
     most_recent = ''
     largest_iteration_number = -100
     for file_name in os.listdir(check_points_dir):
-        iteration_number = int(re.findall(r'model_([\d]+)', file_name)[0])
+        matches = re.findall(r'model_([\d]+)', file_name)
+        if not matches:
+            continue
+
+        iteration_number = int(matches[0])
         if iteration_number > largest_iteration_number:
             largest_iteration_number = iteration_number
             most_recent = file_name

@@ -137,6 +137,9 @@ class BaseHandwritingTask(TrainingTask):
     def get_model(self, device):
         raise NotImplementedError
 
+    def load_model_weights(self, path):
+        self._model = utils.load_saved_weights(self._model, path)
+
     def prepare_batch(self, batch):
         points, transcriptions = batch
         ground_true = utils.PaddedSequencesBatch(points, device=self._device)
@@ -225,7 +228,7 @@ class EpochModelCheckpoint(Callback):
         self._save_dir = save_dir
         self._save_interval = save_interval
 
-        os.makedirs(self._save_dir, exist_ok=False)
+        os.makedirs(self._save_dir, exist_ok=True)
 
     def on_epoch(self, epoch):
         if (epoch + 1) % self._save_interval == 0:
