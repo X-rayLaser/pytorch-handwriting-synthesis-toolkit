@@ -109,7 +109,7 @@ class BaseHandwritingTask(TrainingTask):
     def __init__(self, device):
         self._device = device
         self._model = self.get_model(device)
-        self._model.to(self._device)
+        self._model = self._model.to(self._device)
         #self._optimizer = torch.optim.Adam(self._model.parameters(), lr=0.001)
         self._optimizer = CustomRMSprop(
             self._model.parameters(), lr=0.0001, alpha=0.95, eps=10 ** (-4),
@@ -138,7 +138,8 @@ class BaseHandwritingTask(TrainingTask):
         raise NotImplementedError
 
     def load_model_weights(self, path):
-        self._model = utils.load_saved_weights(self._model, path)
+        model = utils.load_saved_weights(self._model, path)
+        self._model = model.to(self._device)
 
     def prepare_batch(self, batch):
         points, transcriptions = batch

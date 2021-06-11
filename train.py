@@ -48,7 +48,7 @@ def train_unconditional_handwriting_generator(train_set, val_set, config):
     )
 
     train_model(train_set, val_set, train_task, [cb], config,
-                training_task_verbose='Training handwriting prediction model')
+                training_task_verbose='Training (unconditional) handwriting prediction model')
 
 
 def train_handwriting_synthesis_model(train_set, val_set, config):
@@ -62,7 +62,22 @@ def train_handwriting_synthesis_model(train_set, val_set, config):
     )
 
     train_model(train_set, val_set, train_task, [cb], config,
-                training_task_verbose='Training handwriting prediction model')
+                training_task_verbose='Training handwriting synthesis model')
+
+
+def get_device():
+    dev = torch.device("cpu")
+    if torch.cuda.is_available():
+        dev = torch.device("cuda:0")
+    else:
+        try:
+            import torch_xla
+            import torch_xla.core.xla_model as xm
+            # computations on TPU are very slow for some reason
+            dev = xm.xla_device()
+        except ImportError:
+            pass
+    return dev
 
 
 if __name__ == '__main__':
@@ -70,24 +85,19 @@ if __name__ == '__main__':
 
     parser.add_argument("data_path", type=str, help="Directory containing training and validation data h5 files")
     parser.add_argument("model_path", type=str, help="Path for storing model weights")
+    parser.add_argument(
+        "-s", "--synthesis", default=False, action="store_true",
+        help="Whether or not to train synthesis network (unconditional prediction network is trained by default)"
+    )
     parser.add_argument("-b", "--batch_size", type=int, default=32, help="Batch size")
     parser.add_argument("-e", "--epochs", type=int, default=100, help="# of epochs to train")
     parser.add_argument("-i", "--interval", type=int, default=100, help="Iterations between sampling")
 
     args = parser.parse_args()
 
-    device = torch.device("cpu")
-    if torch.cuda.is_available():
-        device = torch.device("cuda:0")
-    else:
-        try:
-            import torch_xla
-            import torch_xla.core.xla_model as xm
-            device = xm.xla_device()
-        except ImportError:
-            pass
+    device = get_device()
 
-    print(f'Will be running on device {device}')
+    print(f'Using device {device}')
 
     with data.H5Dataset('datasets/train.h5') as dataset:
         mu = dataset.mu
@@ -104,8 +114,7 @@ if __name__ == '__main__':
                                num_train_examples, num_val_examples, max_length,
                                model_path)
 
-        unconditional = False
-        if unconditional:
-            train_unconditional_handwriting_generator(train_set, val_set, config)
-        else:
+        if args.synthesis:
             train_handwriting_synthesis_model(train_set, val_set, config)
+        else:
+            train_unconditional_handwriting_generator(train_set, val_set, config)
