@@ -1,7 +1,7 @@
 import argparse
 import torch
 from handwriting_synthesis import training
-from handwriting_synthesis import data
+from handwriting_synthesis import data, utils
 
 
 class ConfigOptions:
@@ -34,8 +34,10 @@ def train_model(train_set, val_set, train_task, callbacks, config, training_task
         loop.add_callback(cb)
 
     model = loop._trainer._model
+    _, largest_epoch = utils.load_saved_weights(model, check_points_dir=config.model_path)
     loop.add_callback(training.EpochModelCheckpoint(model, config.model_path, save_interval=1))
-    loop.start(config.epochs)
+
+    loop.start(initial_epoch=largest_epoch, epochs=config.epochs)
 
 
 def train_unconditional_handwriting_generator(train_set, val_set, config):
@@ -99,20 +101,21 @@ if __name__ == '__main__':
 
     print(f'Using device {device}')
 
-    with data.H5Dataset('datasets/train.h5') as dataset:
+    with data.H5Dataset(f'{args.data_path}/train.h5') as dataset:
         mu = dataset.mu
         sd = dataset.std
 
-    with data.NormalizedDataset('datasets/train.h5', mu, sd) as train_set, \
-            data.NormalizedDataset('datasets/val.h5', mu, sd) as val_set:
+    with data.NormalizedDataset(f'{args.data_path}/train.h5', mu, sd) as train_set, \
+            data.NormalizedDataset(f'{args.data_path}/val.h5', mu, sd) as val_set:
         num_train_examples = len(train_set)
         num_val_examples = len(val_set)
         max_length = train_set.max_length
         model_path = args.model_path
 
-        config = ConfigOptions(args.batch_size, args.epochs, args.interval,
-                               num_train_examples, num_val_examples, max_length,
-                               model_path)
+        config = ConfigOptions(batch_size=args.batch_size, epochs=args.epochs,
+                               sampling_interval=args.interval, num_train_examples=num_train_examples,
+                               num_val_examples=num_val_examples, max_length=max_length,
+                               model_path=model_path)
 
         if args.synthesis:
             train_handwriting_synthesis_model(train_set, val_set, config)

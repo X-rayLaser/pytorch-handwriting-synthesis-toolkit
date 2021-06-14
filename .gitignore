@@ -1,5 +1,6 @@
 venv/
 datasets/
+checkpoints/
 \.idea/
 *.pyc
 *.png

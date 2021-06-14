@@ -99,6 +99,9 @@ def save_to_h5(data, save_path, max_length):
             ds_lengths[i] = unpadded_length
             ds_texts[i] = text
 
+            if (i + 1) % 250 == 0:
+                print(f'Prepared {i + 1} examples')
+
 
 class H5Dataset(torch.utils.data.Dataset):
     def __init__(self, path):

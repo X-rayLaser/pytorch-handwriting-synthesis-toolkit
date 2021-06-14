@@ -32,12 +32,12 @@ class TrainingLoop:
 
         self._callbacks = []
 
-    def start(self, epochs):
-        it = self.get_iterator(epochs)
+    def start(self, initial_epoch, epochs):
+        it = self.get_iterator(initial_epoch, epochs)
         for _ in it:
             pass
 
-    def get_iterator(self, epochs):
+    def get_iterator(self, initial_epoch, epochs):
         loader = DataLoader(self._dataset, self._batch_size, collate_fn=collate)
         num_batches = math.ceil(len(self._dataset) / self._batch_size)
 
@@ -45,7 +45,7 @@ class TrainingLoop:
 
         ma_loss = MovingAverage()
 
-        for epoch in range(epochs):
+        for epoch in range(initial_epoch, initial_epoch + epochs):
             ma_loss.reset()
 
             for i, data in enumerate(loader):
@@ -138,7 +138,7 @@ class BaseHandwritingTask(TrainingTask):
         raise NotImplementedError
 
     def load_model_weights(self, path):
-        model = utils.load_saved_weights(self._model, path)
+        model, epochs = utils.load_saved_weights(self._model, path)
         self._model = model.to(self._device)
 
     def prepare_batch(self, batch):

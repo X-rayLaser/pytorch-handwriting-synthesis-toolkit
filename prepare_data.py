@@ -66,6 +66,8 @@ if __name__ == '__main__':
     factory = IAMonDBProviderFactory('../iam_ondb_home', num_examples)
     train_provider = factory.train_data_provider
     data.build_dataset(train_provider, train_save_path, max_len)
+    print('Prepared training data')
 
     val_provider = factory.val_data_provider
     data.build_dataset(val_provider, val_save_path, max_len)
+    print('Prepared validation data')
