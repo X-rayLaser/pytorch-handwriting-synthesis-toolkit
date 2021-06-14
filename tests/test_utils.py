@@ -1,6 +1,8 @@
 import unittest
 import torch
 from handwriting_synthesis import utils
+from prepare_data import IAMonDBProviderFactory
+from handwriting_synthesis import data
 
 
 class PaddedSequencesBatchTests(unittest.TestCase):
@@ -86,15 +88,23 @@ class PaddedSequencesBatchTests(unittest.TestCase):
 
 
 class VisualizationTests(unittest.TestCase):
-    def test(self):
-        from prepare_data import IAMonDBProviderFactory
-        from handwriting_synthesis import data
-
+    def setUp(self):
         factory = IAMonDBProviderFactory('../../iam_ondb_home', 2)
         provider = factory.train_data_provider
-        examples = list(provider)
-        strokes, transcription = examples[0]
-        print(data.flatten_strokes(strokes))
-        tensor = torch.tensor(data.flatten_strokes(strokes))
+
+        self.steps = 700
+        preprocessed = list(data.preprocess_data(provider, self.steps))
+        points, transcription = preprocessed[0]
+        self.tensor = torch.tensor(points)
+        self.transcription = transcription
+
+    def test_can_visualize_point_sequence(self):
+        tensor = self.tensor
         utils.visualize_strokes(tensor,  lines=True)
-        #self.fail('')
+
+    def test_can_plot_attention_weights(self):
+        seq = self.tensor
+
+        seq_char_size = len(self.transcription)
+        phi = torch.rand(self.steps, seq_char_size)
+        utils.plot_attention_weights(phi, seq, save_path='attention_weights.png')

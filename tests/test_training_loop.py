@@ -11,7 +11,7 @@ class TrainingLoopTests(unittest.TestCase):
 
         output_device = training.InMemoryDevice()
         loop.set_output_device(output_device)
-        loop.start(epochs=2)
+        loop.start(0, epochs=2)
         self.assertIn(f'Epoch {0:4} finished', output_device.lines[0])
         self.assertIn(f'Epoch {1:4} finished', output_device.lines[1])
 
@@ -22,7 +22,7 @@ class TrainingLoopTests(unittest.TestCase):
         output_device = training.InMemoryDevice()
         loop.set_output_device(output_device)
 
-        it = loop.get_iterator(epochs=1)
+        it = loop.get_iterator(0, epochs=1)
 
         next(it)
         self.assertIn(f'Epoch {0:4} 1/2 batches', output_device.lines[0])
@@ -43,7 +43,7 @@ class TrainingLoopTests(unittest.TestCase):
         output_device = training.InMemoryDevice()
         loop.set_output_device(output_device)
         loop.set_training_task(task)
-        loop.start(epochs=2)
+        loop.start(0, epochs=2)
 
         expected_loss = dummy_loss / math.log2(math.e)
         expected = [
@@ -67,7 +67,7 @@ class TrainingLoopTests(unittest.TestCase):
                 on_epoch_args.append(epoch)
 
         loop.add_callback(Foo())
-        loop.start(epochs=2)
+        loop.start(0, epochs=2)
 
         self.assertEqual([(0, 0, 0), (0, 1, 1), (1, 0, 2), (1, 1, 3)], on_iteration_args)
         self.assertEqual([0, 1], on_epoch_args)

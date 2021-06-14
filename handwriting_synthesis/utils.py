@@ -3,7 +3,10 @@ import os
 import torch
 import numpy as np
 from PIL import Image, ImageDraw
+import matplotlib.pyplot as plt
+from matplotlib import collections as mc
 import iam_ondb
+
 
 class BatchAdapter:
     def prepare_inputs(self, batch):
@@ -90,25 +93,33 @@ class BadInputError(Exception):
     pass
 
 
-def visualize_strokes(seq, save_path='img.png', lines=False):
-    seq = seq.cpu()
+def split_into_components(seq):
+    from . import data
+    seq = seq.cpu().numpy()
 
     x_offsets = seq[:, 0]
     y_offsets = seq[:, 1]
     eos = seq[:, 2]
+    offsets = zip(x_offsets.tolist(), y_offsets.tolist(), eos.tolist())
 
     x = []
     y = []
-    prev_x = 0
-    prev_y = 0
-    for offset in x_offsets:
-        prev_x = prev_x + offset
-        x.append(prev_x)
 
-    for offset in y_offsets:
-        prev_y = prev_y + offset
-        y.append(prev_y)
+    absolute = data.to_absolute_coordinates(offsets)
+    for x_abs, y_abs, _ in absolute:
+        x.append(x_abs)
+        y.append(y_abs)
 
+    return x, y, eos
+
+
+def visualize_strokes(seq, save_path='img.png', lines=False):
+    im = create_strokes_image(seq, lines)
+    im.save(save_path)
+
+
+def create_strokes_image(seq, lines=False):
+    x, y, eos = split_into_components(seq)
     x = np.array(x)
     y = np.array(y)
     x_with_offset = x - np.floor(x.min())
@@ -128,12 +139,35 @@ def visualize_strokes(seq, save_path='img.png', lines=False):
         for stroke in get_strokes(x_with_offset, y_with_offset, eos):
             canvas.line(stroke, width=10, fill=255)
     else:
-        for i in range(len(x)):
-            x = x_with_offset[i]
-            y = y_with_offset[i]
-            canvas.ellipse([(x, y), (x + 5, y + 5)], width=10, fill=255)
+        draw_points(x_with_offset, y_with_offset, canvas)
+    return im
 
-    im.save(save_path)
+
+def draw_points(x, y, canvas):
+    for i in range(len(x)):
+        xi = x[i]
+        yi = y[i]
+        canvas.ellipse([(xi, yi), (xi + 5, yi + 5)], width=10, fill=255)
+
+
+def plot_attention_weights(phi, seq, save_path='img.png'):
+    x, y, eos = split_into_components(seq)
+
+    strokes = list(get_strokes(x, y, eos))
+
+    best_phi = phi.cpu().numpy().argmax(axis=1)
+
+    fig, axes = plt.subplots(2)
+    fig.set_size_inches(18.5, 10.5)
+
+    axes[0].scatter(x, best_phi)
+
+    c = (1, 0, 0, 1)
+    lc = mc.LineCollection(strokes, colors=c, linewidths=2)
+    axes[1].add_collection(lc)
+    axes[1].autoscale()
+    axes[1].invert_yaxis()
+    plt.savefig(save_path)
 
 
 def get_strokes(x, y, eos):

@@ -106,16 +106,6 @@ class SoftWindow(jit.ScriptModule):
         w = self.matmul_3d(phi, c)
         return w, k_new
 
-        # remove this
-        #densities = []
-        #for u in range(num_chars):
-        #    t = alpha * torch.exp(-beta * (k - u) ** 2)
-        #    densities.append(t.unsqueeze(0))
-
-        #phi = torch.cat(densities, dim=0).sum(dim=1)
-        #w = torch.matmul(phi, c).unsqueeze(0)
-        #return w, k
-
     def compute_attention_weights(self, alpha, beta, k, char_seq_size: int):
         alpha = alpha.unsqueeze(2).repeat(1, 1, char_seq_size)
         beta = beta.unsqueeze(2).repeat(1, 1, char_seq_size)
