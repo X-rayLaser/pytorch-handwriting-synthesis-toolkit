@@ -1,5 +1,7 @@
 import re
 import os
+import traceback
+
 import torch
 import numpy as np
 from PIL import Image, ImageDraw
@@ -155,7 +157,7 @@ def plot_attention_weights(phi, seq, save_path='img.png'):
 
     strokes = list(get_strokes(x, y, eos))
 
-    best_phi = phi.cpu().numpy().argmax(axis=1)
+    best_phi = phi.cpu().detach().numpy().argmax(axis=1)
 
     fig, axes = plt.subplots(2)
     fig.set_size_inches(18.5, 10.5)
@@ -325,3 +327,25 @@ class DataSetFactory:
 
         return training_ds, validation_ds
 
+
+class HandwritingSynthesizer:
+    def __init__(self, model, mu, sd, num_steps, stochastic=True):
+        self.model = model
+        self.num_steps = num_steps
+        self.mu = mu
+        self.sd = sd
+        self.stochastic = stochastic
+
+    def synthesize(self, c, output_path, show_attention=False):
+        try:
+            if show_attention:
+                sampled_handwriting, phi = self.model.sample_means_with_attention(context=c, steps=self.num_steps,
+                                                                                  stochastic=self.stochastic)
+                sampled_handwriting = sampled_handwriting * self.sd + self.mu
+                plot_attention_weights(phi, sampled_handwriting, output_path)
+            else:
+                sampled_handwriting = self.model.sample_means(context=c, steps=700, stochastic=True)
+                sampled_handwriting = sampled_handwriting * self.sd + self.mu
+                visualize_strokes(sampled_handwriting, output_path, lines=True)
+        except Exception:
+            traceback.print_exc()
