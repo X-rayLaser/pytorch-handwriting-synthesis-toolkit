@@ -375,9 +375,9 @@ class SoftWindowTests(unittest.TestCase):
         x = torch.zeros(batch_size, 1, input_size)
         prev_k = torch.zeros(batch_size, num_components)
         c = torch.zeros(batch_size, num_chars, alphabet_size)
-        w, k = window(x, c, prev_k)
+        phi, k = window(x, c, prev_k)
 
-        self.assertTupleEqual((batch_size, 1, alphabet_size), w.shape)
+        self.assertTupleEqual((batch_size, 1, num_chars), phi.shape)
         self.assertTupleEqual((batch_size, num_components), k.shape)
 
     def test_computes_attention_weights_correctly_on_batch_size_of_1(self):

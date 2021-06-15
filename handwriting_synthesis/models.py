@@ -92,7 +92,7 @@ class SoftWindow(jit.ScriptModule):
         :param x: tensor of shape (batch_size, 1, input_size)
         :param c: tensor of shape (batch_size, num_characters, alphabet_size)
         :param prev_k: tensor of shape (batch_size, num_components)
-        :return: window of shape (batch_size, 1, alphabet_size), k of shape (batch_size, num_components)
+        :return: window of shape (batch_size, 1, num_characters), k of shape (batch_size, num_components)
         """
 
         x = x[:, 0]
@@ -103,8 +103,7 @@ class SoftWindow(jit.ScriptModule):
 
         batch_size, num_chars, _ = c.shape
         phi = self.compute_attention_weights(alpha, beta, k_new, num_chars)
-        w = self.matmul_3d(phi, c)
-        return w, k_new
+        return phi, k_new
 
     def compute_attention_weights(self, alpha, beta, k, char_seq_size: int):
         alpha = alpha.unsqueeze(2).repeat(1, 1, char_seq_size)
@@ -202,7 +201,8 @@ class SynthesisNetwork(jit.ScriptModule):
             x_t = x[:, t:t + 1, :]
             x_with_w = torch.cat([x_t, w_t], dim=-1)
             h_t, hidden1 = self.lstm1(x_with_w, hidden1)
-            w_t, k = self.window(h_t, c, k)
+            phi, k = self.window(h_t, c, k)
+            w_t = self.window.matmul_3d(phi, c)
 
             h1.append(h_t)
             w1.append(w_t)
@@ -240,50 +240,11 @@ class SynthesisNetwork(jit.ScriptModule):
     def get_initial_window(self, batch_size: int):
         return torch.zeros(batch_size, 1, self.alphabet_size, device=self.device)
 
-    def forward_without_tf(self, x, c):
-        steps = x.shape[1]
-        batch_size, u, _ = c.shape
-        assert batch_size == 1
-        c = c[0]
-        x = self.get_initial_input()
-        w = self.get_initial_window()
-        k = torch.zeros(self.gaussian_components, device=self.device, dtype=torch.float32)
-
-        hidden1, hidden2, hidden3 = self.get_all_initial_states()
-
-        pi_list = []
-        mu_list = []
-        sd_list = []
-        ro_list = []
-        eos_list = []
-        for t in range(steps):
-            x_with_w = torch.cat([x, w], dim=1)
-            h1, hidden1 = self.lstm1(x_with_w, hidden1)
-
-            w, k = self.window(h1, c, k)
-
-            mixture, hidden2, hidden3 = self.compute_mixture(x, h1, w, hidden2, hidden3)
-            pi, mu, sd, ro, eos = mixture
-            pi_list.append(pi)
-            mu_list.append(mu)
-            sd_list.append(sd)
-            ro_list.append(ro)
-            eos_list.append(eos)
-
-            mixture = self.squeeze(mixture)
-            x = self.get_mean_prediction(mixture, stochastic=False)
-            x = x.unsqueeze(0)
-
-        pi = torch.cat(pi_list, dim=0)
-        mu = torch.cat(mu_list, dim=0)
-        sd = torch.cat(sd_list, dim=0)
-        ro = torch.cat(ro_list, dim=0)
-        eos = torch.cat(eos_list, dim=0)
-
-        mixtures = (pi, mu, sd, ro, eos)
-        return self.unsqueeze(mixtures)
-
     def sample_means(self, context=None, steps=700, stochastic=False):
+        outputs, _ = self.sample_means_with_attention(context, steps, stochastic)
+        return outputs
+
+    def sample_means_with_attention(self, context=None, steps=700, stochastic=False):
         c = context.to(self.device)
         batch_size, u, _ = c.shape
         assert batch_size == 1
@@ -294,11 +255,13 @@ class SynthesisNetwork(jit.ScriptModule):
         hidden1, hidden2, hidden3 = self.get_all_initial_states(batch_size)
 
         outputs = []
+        attention_weights = []
         for t in range(steps):
             x_with_w = torch.cat([x, w], dim=-1)
             h1, hidden1 = self.lstm1(x_with_w, hidden1)
 
-            w, k = self.window(h1, c, k)
+            phi, k = self.window(h1, c, k)
+            w = self.window.matmul_3d(phi, c)
 
             mixture, hidden2, hidden3 = self.compute_mixture(x, h1, w, hidden2, hidden3)
             mixture = self.squeeze(mixture)
@@ -306,7 +269,9 @@ class SynthesisNetwork(jit.ScriptModule):
             outputs.append(x_temp)
             x = x_temp.unsqueeze(0)
 
-        return torch.cat(outputs, dim=0)
+            attention_weights.append(phi.squeeze(0))
+
+        return torch.cat(outputs, dim=0), torch.cat(attention_weights, dim=0)
 
     def squeeze(self, mixture: Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]):
         pi, mu, sd, ro, eos = mixture

@@ -318,3 +318,22 @@ class HandwritingSynthesisCallback(HandwritingGenerationCallback):
             res.append((file_name, context))
 
         return res
+
+    def generate_handwriting(self, save_path, steps, stochastic=True, context=None):
+        # todo: modify model sample means to return phi as well
+        # todo: show attention weights for every actual sequence point (not predicted one)
+        # todo: validation loss and validation MSE metric
+        # todo: move (de)normalization logic inside torch layer
+        super().generate_handwriting(save_path, steps, stochastic=True, context=None)
+        path, ext = os.path.splitext(save_path)
+
+        save_path = f'{path}_attention{ext}'
+
+        try:
+            sampled_handwriting = self.model.sample_means(steps=steps, stochastic=stochastic, context=context)
+            sampled_handwriting = sampled_handwriting.cpu()
+            sampled_handwriting = self.train_set.denormalize(sampled_handwriting)
+            visualize_strokes(sampled_handwriting, save_path, lines=True)
+            utils.plot_attention_weights()
+        except Exception:
+            traceback.print_exc()
