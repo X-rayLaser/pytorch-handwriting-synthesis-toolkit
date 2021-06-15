@@ -85,8 +85,8 @@ def get_device():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("data_path", type=str, help="Directory containing training and validation data h5 files")
-    parser.add_argument("model_path", type=str, help="Path for storing model weights")
+    parser.add_argument("data_dir", type=str, help="Directory containing training and validation data h5 files")
+    parser.add_argument("model_dir", type=str, help="Directory storing model weights")
     parser.add_argument(
         "-s", "--synthesis", default=False, action="store_true",
         help="Whether or not to train synthesis network (unconditional prediction network is trained by default)"
@@ -101,16 +101,16 @@ if __name__ == '__main__':
 
     print(f'Using device {device}')
 
-    with data.H5Dataset(f'{args.data_path}/train.h5') as dataset:
+    with data.H5Dataset(f'{args.data_dir}/train.h5') as dataset:
         mu = dataset.mu
         sd = dataset.std
 
-    with data.NormalizedDataset(f'{args.data_path}/train.h5', mu, sd) as train_set, \
-            data.NormalizedDataset(f'{args.data_path}/val.h5', mu, sd) as val_set:
+    with data.NormalizedDataset(f'{args.data_dir}/train.h5', mu, sd) as train_set, \
+            data.NormalizedDataset(f'{args.data_dir}/val.h5', mu, sd) as val_set:
         num_train_examples = len(train_set)
         num_val_examples = len(val_set)
         max_length = train_set.max_length
-        model_path = args.model_path
+        model_path = args.model_dir
 
         config = ConfigOptions(batch_size=args.batch_size, epochs=args.epochs,
                                sampling_interval=args.interval, num_train_examples=num_train_examples,
