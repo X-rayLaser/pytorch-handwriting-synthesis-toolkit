@@ -292,6 +292,8 @@ class HandwritingGenerationCallback(Callback):
 
     def generate_handwriting(self, save_path, steps, stochastic=True, context=None):
         mu, std = self.train_set.mu, self.train_set.std
+        mu = torch.tensor(mu)
+        std = torch.tensor(std)
         synthesizer = utils.HandwritingSynthesizer(self.model, mu, std, num_steps=steps, stochastic=stochastic)
         synthesizer.synthesize(c=context, output_path=save_path, show_attention=False)
 
@@ -300,6 +302,9 @@ class HandwritingSynthesisCallback(HandwritingGenerationCallback):
     def __init__(self, images_per_iterations=10, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.images_per_iteration = images_per_iterations
+
+        self.mu = torch.tensor(self.train_set.mu)
+        self.std = torch.tensor(self.train_set.std)
 
     def get_names_with_contexts(self, iteration):
         images_per_iteration = min(len(self.train_set), self.images_per_iteration)
@@ -316,11 +321,12 @@ class HandwritingSynthesisCallback(HandwritingGenerationCallback):
         return res
 
     def generate_handwriting(self, save_path, steps, stochastic=True, context=None):
-        super().generate_handwriting(save_path, steps, stochastic=True, context=None)
+        super().generate_handwriting(save_path, steps, stochastic=stochastic, context=context)
 
         path, ext = os.path.splitext(save_path)
         save_path = f'{path}_attention{ext}'
 
-        mu, std = self.train_set.mu, self.train_set.std
-        synthesizer = utils.HandwritingSynthesizer(self.model, mu, std, num_steps=steps, stochastic=stochastic)
+        synthesizer = utils.HandwritingSynthesizer(
+            self.model, self.mu, self.std, num_steps=steps, stochastic=stochastic
+        )
         synthesizer.synthesize(c=context, output_path=save_path, show_attention=False)

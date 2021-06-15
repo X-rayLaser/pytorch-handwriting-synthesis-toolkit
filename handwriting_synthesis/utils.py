@@ -170,6 +170,7 @@ def plot_attention_weights(phi, seq, save_path='img.png'):
     axes[1].autoscale()
     axes[1].invert_yaxis()
     plt.savefig(save_path)
+    plt.close('all')
 
 
 def get_strokes(x, y, eos):
@@ -341,10 +342,12 @@ class HandwritingSynthesizer:
             if show_attention:
                 sampled_handwriting, phi = self.model.sample_means_with_attention(context=c, steps=self.num_steps,
                                                                                   stochastic=self.stochastic)
+                sampled_handwriting = sampled_handwriting.cpu()
                 sampled_handwriting = sampled_handwriting * self.sd + self.mu
                 plot_attention_weights(phi, sampled_handwriting, output_path)
             else:
-                sampled_handwriting = self.model.sample_means(context=c, steps=700, stochastic=True)
+                sampled_handwriting = self.model.sample_means(context=c, steps=700, stochastic=self.stochastic)
+                sampled_handwriting = sampled_handwriting.cpu()
                 sampled_handwriting = sampled_handwriting * self.sd + self.mu
                 visualize_strokes(sampled_handwriting, output_path, lines=True)
         except Exception:
