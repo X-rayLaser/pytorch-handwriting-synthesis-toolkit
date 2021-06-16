@@ -4,6 +4,7 @@ import unittest
 
 import torch
 
+import handwriting_synthesis.callbacks
 from handwriting_synthesis import training
 
 
@@ -20,7 +21,7 @@ class CallbackTests(unittest.TestCase):
     def test_callback_will_not_save_on_iteration(self):
         model = torch.nn.Sequential(torch.nn.Linear(1, 1))
 
-        checkpoint = training.EpochModelCheckpoint(model, self._save_dir, save_interval=1)
+        checkpoint = handwriting_synthesis.callbacks.EpochModelCheckpoint(model, self._save_dir, save_interval=1)
 
         checkpoint.on_iteration(epoch=0, epoch_iteration=10, iteration=25)
         self.assertEqual(len(list(os.listdir(self._save_dir))), 0)
@@ -28,14 +29,14 @@ class CallbackTests(unittest.TestCase):
     def test_callback_will_not_save_on_epoch(self):
         model = torch.nn.Sequential(torch.nn.Linear(1, 1))
 
-        checkpoint = training.IterationModelCheckpoint(model, self._save_dir, save_interval=1)
+        checkpoint = handwriting_synthesis.callbacks.IterationModelCheckpoint(model, self._save_dir, save_interval=1)
 
         checkpoint.on_epoch(epoch=4)
         self.assertEqual(len(list(os.listdir(self._save_dir))), 0)
 
     def test_epoch_checkpoint_will_save_model_on_epoch_end_at_right_intervals(self):
         model = torch.nn.Sequential(torch.nn.Linear(1, 1))
-        checkpoint = training.EpochModelCheckpoint(model, self._save_dir, save_interval=3)
+        checkpoint = handwriting_synthesis.callbacks.EpochModelCheckpoint(model, self._save_dir, save_interval=3)
         checkpoint.on_epoch(0)
         save_path = os.path.join(self._save_dir, f'model_at_epoch_{0}.pt')
         self.assertFalse(os.path.exists(save_path))

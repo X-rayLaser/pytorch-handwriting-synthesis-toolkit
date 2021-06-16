@@ -1,7 +1,7 @@
 import unittest
 import torch
 from handwriting_synthesis import utils
-from prepare_data import IAMonDBProviderFactory
+from handwriting_synthesis.data_providers import IAMonDBProviderFactory
 from handwriting_synthesis import data
 
 

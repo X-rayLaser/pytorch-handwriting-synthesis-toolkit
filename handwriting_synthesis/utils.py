@@ -7,15 +7,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 import matplotlib.pyplot as plt
 from matplotlib import collections as mc
-import iam_ondb
-
-
-class BatchAdapter:
-    def prepare_inputs(self, batch):
-        pass
-
-    def prepare_loss_inputs(self, batch):
-        pass
+from . import data
 
 
 class PaddedSequencesBatch:
@@ -96,7 +88,6 @@ class BadInputError(Exception):
 
 
 def split_into_components(seq):
-    from . import data
     seq = seq.cpu().numpy()
 
     x_offsets = seq[:, 0]
@@ -192,6 +183,7 @@ def get_strokes(x, y, eos):
 
 def load_saved_weights(model, check_points_dir='check_points'):
     if not os.path.isdir(check_points_dir):
+        print(f'Cannot load a model because directory {check_points_dir} does not exist')
         return model, 0
 
     most_recent = ''
@@ -215,120 +207,6 @@ def load_saved_weights(model, check_points_dir='check_points'):
     return model, largest_epoch
 
 
-def points_stream(stroke_set):
-    for stroke in stroke_set:
-        for x, y, _ in stroke[:-1]:
-            yield x, y, 0
-        x, y, _ = stroke[-1]
-        yield x, y, 1
-
-
-def to_tensor(stroke_set, max_length):
-    t = []
-
-    first_stroke = stroke_set[0]
-    first_point = first_stroke[0]
-    prev = first_point[0], first_point[1]
-
-    for x, y, eos in points_stream(stroke_set):
-        prev_x, prev_y = prev
-        t.append([x - prev_x, y - prev_y, eos])
-        prev = x, y
-
-        if len(t) == max_length:
-            t[-1][2] = 1
-            break
-
-    return torch.tensor(t, dtype=torch.float32)
-
-
-# todo: redesign dataset pipeline to support permanent splits
-
-
-class IamOnDBDataset(torch.utils.data.Dataset):
-    def __init__(self, tensors, texts, mu, sd):
-        self.tensors = tensors
-        self.texts = texts
-        self.mu = mu
-        self.sd = sd
-
-    def normalize(self, tensor):
-        return (tensor - self.mu) / self.sd
-
-    def denormalize(self, tensor):
-        return tensor * self.sd + self.mu
-
-    def __len__(self):
-        return len(self.tensors)
-
-    def __getitem__(self, item):
-        tensor = self.tensors[item]
-        tensor = self.normalize(tensor)
-        points = tensor.numpy().tolist()
-        text = self.texts[item]
-        return points, text
-
-
-class DataSetFactory:
-    def __init__(self, ds_path, num_examples=None, max_length=50):
-        self.ds_path = ds_path
-        self.max_length = max_length
-        self.num_examples = num_examples
-        self.tensors, self.texts = self.preload(ds_path, num_examples)
-        self.mu, self.sd = self.estimate_mu_and_sd(self.tensors)
-
-    def preload(self, ds_path, num_examples):
-        db = iam_ondb.IAMonDB(ds_path)
-
-        tensors = []
-        texts = []
-
-        if self.num_examples is None:
-            it = db
-        else:
-            it = iam_ondb.bounded_iterator(db, num_examples)
-
-        for stroke_set, _, text in it:
-            t = to_tensor(stroke_set, self.max_length)
-
-            tensors.append(t)
-            texts.append(text)
-            size = len(tensors)
-            if size % 250 == 0:
-                if num_examples:
-                    print(f'Loaded {size} out of {num_examples} examples')
-                else:
-                    print(f'Loaded {size} examples')
-        return tensors, texts
-
-    def estimate_mu_and_sd(self, tensors):
-        t = torch.cat(tensors, dim=0)
-
-        mu = t.mean(dim=0)
-        sd = t.std(dim=0)
-        mu[2] = 0.
-        sd[2] = 1.
-        return mu, sd
-
-    def split_data(self):
-        if self.num_examples is None:
-            train_size, val1_size, val2_size, test_size = 5364, 1438, 1518, 3859
-            train_split_size = train_size + test_size + val2_size
-        else:
-            training_fraction = 0.8
-            train_split_size = int(training_fraction * self.num_examples)
-
-        training_examples = self.tensors[:train_split_size]
-        training_texts = self.texts[:train_split_size]
-        validation_examples = self.tensors[train_split_size:]
-        validation_texts = self.texts[train_split_size:]
-
-        training_ds = IamOnDBDataset(training_examples, training_texts, self.mu, self.sd)
-        validation_ds = IamOnDBDataset(validation_examples, validation_texts, self.mu, self.sd)
-
-        return training_ds, validation_ds
-
-
 class HandwritingSynthesizer:
     def __init__(self, model, mu, sd, num_steps, stochastic=True):
         self.model = model
@@ -346,7 +224,8 @@ class HandwritingSynthesizer:
                 sampled_handwriting = sampled_handwriting * self.sd + self.mu
                 plot_attention_weights(phi, sampled_handwriting, output_path)
             else:
-                sampled_handwriting = self.model.sample_means(context=c, steps=700, stochastic=self.stochastic)
+                sampled_handwriting = self.model.sample_means(context=c, steps=self.num_steps,
+                                                              stochastic=self.stochastic)
                 sampled_handwriting = sampled_handwriting.cpu()
                 sampled_handwriting = sampled_handwriting * self.sd + self.mu
                 visualize_strokes(sampled_handwriting, output_path, lines=True)

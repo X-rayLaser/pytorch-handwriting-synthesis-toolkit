@@ -1,6 +1,8 @@
 import math
 import unittest
 
+import handwriting_synthesis.callbacks
+import handwriting_synthesis.tasks
 from handwriting_synthesis import training
 
 
@@ -38,7 +40,7 @@ class TrainingLoopTests(unittest.TestCase):
         loop = training.TrainingLoop(ds, batch_size=1)
 
         dummy_loss = 23.32
-        task = training.DummyTask(dummy_loss)
+        task = handwriting_synthesis.tasks.DummyTask(dummy_loss)
 
         output_device = training.InMemoryDevice()
         loop.set_output_device(output_device)
@@ -59,7 +61,7 @@ class TrainingLoopTests(unittest.TestCase):
         on_iteration_args = []
         on_epoch_args = []
 
-        class Foo(training.Callback):
+        class Foo(handwriting_synthesis.callbacks.Callback):
             def on_iteration(self, epoch, epoch_iteration, iteration):
                 on_iteration_args.append((epoch, epoch_iteration, iteration))
 

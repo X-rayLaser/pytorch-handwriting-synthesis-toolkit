@@ -1,5 +1,8 @@
 import argparse
 import torch
+
+import handwriting_synthesis.callbacks
+import handwriting_synthesis.tasks
 from handwriting_synthesis import training
 from handwriting_synthesis import data, utils
 
@@ -35,16 +38,16 @@ def train_model(train_set, val_set, train_task, callbacks, config, training_task
 
     model = loop._trainer._model
     _, largest_epoch = utils.load_saved_weights(model, check_points_dir=config.model_path)
-    loop.add_callback(training.EpochModelCheckpoint(model, config.model_path, save_interval=1))
+    loop.add_callback(handwriting_synthesis.callbacks.EpochModelCheckpoint(model, config.model_path, save_interval=1))
 
     loop.start(initial_epoch=largest_epoch, epochs=config.epochs)
 
 
 def train_unconditional_handwriting_generator(train_set, val_set, config):
-    train_task = training.HandwritingPredictionTrainingTask(device)
+    train_task = handwriting_synthesis.tasks.HandwritingPredictionTrainingTask(device)
     train_task.load_model_weights(config.model_path)
 
-    cb = training.HandwritingGenerationCallback(
+    cb = handwriting_synthesis.callbacks.HandwritingGenerationCallback(
         train_task._model, 'samples', max_length,
         train_set, iteration_interval=config.sampling_interval
     )
@@ -54,10 +57,10 @@ def train_unconditional_handwriting_generator(train_set, val_set, config):
 
 
 def train_handwriting_synthesis_model(train_set, val_set, config):
-    train_task = training.HandwritingSynthesisTask(device)
+    train_task = handwriting_synthesis.tasks.HandwritingSynthesisTask(device)
     train_task.load_model_weights(config.model_path)
 
-    cb = training.HandwritingSynthesisCallback(
+    cb = handwriting_synthesis.callbacks.HandwritingSynthesisCallback(
         10,
         train_task._model, 'synthesized', max_length,
         train_set, iteration_interval=config.sampling_interval

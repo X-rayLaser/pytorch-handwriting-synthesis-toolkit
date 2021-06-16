@@ -1,7 +1,10 @@
 import re
+import os
 import argparse
-import traceback
 import torch
+
+import handwriting_synthesis.callbacks
+import handwriting_synthesis.tasks
 from handwriting_synthesis import data, utils, training
 
 
@@ -10,6 +13,7 @@ if __name__ == '__main__':
     parser.add_argument("data_dir", type=str, help="Path to prepared dataset directory")
     parser.add_argument("path", type=str, help="Path to saved model")
     parser.add_argument("text", type=str, help="Text to be converted to handwriting")
+    parser.add_argument("--trials",  type=int, default=1, help="Number of attempts")
     parser.add_argument(
         "--show_weights", default=False, action="store_true",
         help="When set, will produce a plot: handwriting against attention weights"
@@ -21,25 +25,31 @@ if __name__ == '__main__':
     )
 
     args = parser.parse_args()
-    text = args.text
     stochastic = not args.deterministic
-    data_dir = args.data_dir
-    model_path = args.path
-    show_weights = args.show_weights
 
     device = torch.device("cpu")
-    model = training.HandwritingSynthesisTask(device)._model
+    model = handwriting_synthesis.tasks.HandwritingSynthesisTask(device)._model
 
-    output_path = re.sub('[^0-9a-zA-Z]+', '_', text)
-    output_path = f'{output_path}.png'
+    base_file_name = re.sub('[^0-9a-zA-Z]+', '_', args.text)
 
-    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.load_state_dict(torch.load(args.path, map_location=device))
 
-    c = training.transcriptions_to_tensor([text])
+    c = handwriting_synthesis.callbacks.transcriptions_to_tensor([args.text])
 
-    with data.H5Dataset(f'{data_dir}/train.h5') as dataset:
+    with data.H5Dataset(f'{args.data_dir}/train.h5') as dataset:
         mu = torch.tensor(dataset.mu)
         sd = torch.tensor(dataset.std)
 
     synthesizer = utils.HandwritingSynthesizer(model, mu, sd, num_steps=700, stochastic=stochastic)
-    synthesizer.synthesize(c, output_path, show_attention=show_weights)
+
+    output_dir = 'samples'
+    os.makedirs(output_dir, exist_ok=True)
+
+    for i in range(args.trials):
+        output_path = os.path.join(output_dir, f'{base_file_name}_{i}.png')
+        synthesizer.synthesize(c, output_path, show_attention=args.show_weights)
+        print(f'Done {i} / {args.trials}')
+
+
+# todo: cache mu, sd
+# todo: move normalization parameters inside a model

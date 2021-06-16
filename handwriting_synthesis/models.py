@@ -1,13 +1,8 @@
 import torch
 import torch.nn as nn
-from torch.nn import Parameter
 import torch.jit as jit
-import warnings
-from collections import namedtuple
 from typing import List, Tuple
 from torch import Tensor
-import numbers
-import time
 import math
 from torch.nn import functional as F
 
@@ -120,51 +115,6 @@ class SoftWindow(jit.ScriptModule):
         return torch.bmm(phi, c)
 
 
-class BatchLessLSTM(nn.Module):
-    def __init__(self, input_size, hidden_size):
-        super().__init__()
-        self.lstm = PeepholeLSTM(input_size, hidden_size)
-
-    def forward(self, x: Tensor, initial_states: Tuple[Tensor, Tensor]):
-        """
-
-        :param x: tensor of shape (sequence_size, input_size)
-        :param initial_states: tensor of shape (hidden_size,)
-        :return: x of shape (sequence_size, hidden_size), (h,c) of shape (hidden_size,)
-        """
-        x = x.unsqueeze(0)
-        h, c = initial_states
-
-        h = h.unsqueeze(0)
-        c = c.unsqueeze(0)
-        initial_states = (h, c)
-        y_hat, (h, c) = self.lstm(x, initial_states)
-        y_hat = y_hat[0]
-        h = h[0]
-        c = c[0]
-        return y_hat, (h, c)
-
-
-class BatchLessMixture(nn.Module):
-    def __init__(self, input_size, num_components):
-        super().__init__()
-        self.mixture = MixtureDensityLayer(input_size, num_components)
-
-    def forward(self, x):
-        """
-        :param x: tensor of shape (sequence_size, input_size)
-        :return: (pi, mu, sd, ro, eos)
-        """
-        x = x.unsqueeze(0)
-        pi, mu, sd, ro, eos = self.mixture(x)
-        pi = pi[0]
-        mu = mu[0]
-        sd = sd[0]
-        ro = ro[0]
-        eos = eos[0]
-        return pi, mu, sd, ro, eos
-
-
 class SynthesisNetwork(jit.ScriptModule):
     def __init__(self, input_size, hidden_size, alphabet_size, device, gaussian_components=10, output_mixtures=20):
         super().__init__()
@@ -212,7 +162,8 @@ class SynthesisNetwork(jit.ScriptModule):
         return h, w
 
     @jit.script_method
-    def compute_mixture(self, x: Tensor, h1: Tensor, w1: Tensor, hidden2: Tuple[Tensor, Tensor], hidden3: Tuple[Tensor, Tensor]):
+    def compute_mixture(self, x: Tensor, h1: Tensor, w1: Tensor,
+                        hidden2: Tuple[Tensor, Tensor], hidden3: Tuple[Tensor, Tensor]):
         inputs = torch.cat([x, h1, w1], dim=-1)
         h2, hidden2 = self.lstm2(inputs, hidden2)
 
@@ -382,7 +333,6 @@ class HandwritingPredictionNetwork(nn.Module):
             eos_flag = 0
 
         return torch.tensor([mu1, mu2, eos_flag], device=self.device)
-
 
 
 def expand_dims(shape):
