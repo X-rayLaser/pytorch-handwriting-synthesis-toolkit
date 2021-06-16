@@ -1,4 +1,3 @@
-import math
 import unittest
 
 import handwriting_synthesis.callbacks
@@ -9,7 +8,7 @@ from handwriting_synthesis import training
 class TrainingLoopTests(unittest.TestCase):
     def test_loop_prints_epochs(self):
         ds = [(i, i**2) for i in range(3)]
-        loop = training.TrainingLoop(ds, batch_size=1)
+        loop = training.TrainingLoop(ds, ds, batch_size=1)
 
         output_device = training.InMemoryDevice()
         loop.set_output_device(output_device)
@@ -17,46 +16,9 @@ class TrainingLoopTests(unittest.TestCase):
         self.assertIn(f'Epoch {0:4} finished', output_device.lines[0])
         self.assertIn(f'Epoch {1:4} finished', output_device.lines[1])
 
-    def test_loop_prints_epoch_progress(self):
-        ds = [(i, i**2) for i in range(2)]
-        loop = training.TrainingLoop(ds, batch_size=1)
-
-        output_device = training.InMemoryDevice()
-        loop.set_output_device(output_device)
-
-        it = loop.get_iterator(0, epochs=1)
-
-        next(it)
-        self.assertIn(f'Epoch {0:4} 1/2 batches', output_device.lines[0])
-
-        next(it)
-        self.assertIn(f'Epoch {0:4} 2/2 batches', output_device.lines[0])
-
-        next(it)
-        self.assertIn(f'Epoch {0:4} finished', output_device.lines[0])
-
-    def test_loop_prints_metrics_after_every_epoch(self):
-        ds = [(i, i**2) for i in range(2)]
-        loop = training.TrainingLoop(ds, batch_size=1)
-
-        dummy_loss = 23.32
-        task = handwriting_synthesis.tasks.DummyTask(dummy_loss)
-
-        output_device = training.InMemoryDevice()
-        loop.set_output_device(output_device)
-        loop.set_training_task(task)
-        loop.start(0, epochs=2)
-
-        expected_loss = dummy_loss / math.log2(math.e)
-        expected = [
-            f"\rEpoch {0:4} finished. Loss {expected_loss:7.2f} nats.",
-            f"\rEpoch {0:4} finished. Loss {expected_loss:7.2f} nats."
-        ]
-        self.assertIn(expected[0], output_device.lines[0])
-
     def test_callback_is_invoked(self):
         ds = [(0, 0), (1, 1)]
-        loop = training.TrainingLoop(ds, batch_size=1)
+        loop = training.TrainingLoop(ds, ds, batch_size=1)
 
         on_iteration_args = []
         on_epoch_args = []

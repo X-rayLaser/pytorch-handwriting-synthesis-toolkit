@@ -132,4 +132,4 @@ class HandwritingSynthesisCallback(HandwritingGenerationCallback):
         synthesizer = utils.HandwritingSynthesizer(
             self.model, self.mu, self.std, num_steps=steps, stochastic=stochastic
         )
-        synthesizer.synthesize(c=context, output_path=save_path, show_attention=False)
+        synthesizer.synthesize(c=context, output_path=save_path, show_attention=True)

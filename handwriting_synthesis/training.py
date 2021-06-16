@@ -14,9 +14,24 @@ def collate(batch):
     return x, y
 
 
+def compute_validation_loss(trainer, dataset, batch_size):
+    loader = DataLoader(dataset, batch_size, collate_fn=collate)
+
+    ma_loss = MovingAverage()
+    ma_loss.reset()
+
+    with torch.no_grad():
+        for i, data in enumerate(loader):
+            y_hat, loss = trainer.compute_loss(data)
+            ma_loss.update(loss)
+
+    return ma_loss.nats
+
+
 class TrainingLoop:
-    def __init__(self, dataset, batch_size, training_task=None):
+    def __init__(self, dataset, validation_dataset, batch_size, training_task=None):
         self._dataset = dataset
+        self._val_set = validation_dataset
         self._output_device = ConsoleDevice()
         self._batch_size = batch_size
 
@@ -58,7 +73,8 @@ class TrainingLoop:
                 iteration += 1
                 yield
 
-            s = self._format_epoch_info(epoch, ma_loss.nats)
+            val_loss_nats = compute_validation_loss(self._trainer, self._val_set, self._batch_size)
+            s = self._format_epoch_info(epoch, ma_loss.nats, val_loss_nats)
 
             self._run_epoch_callbacks(epoch)
             self._output_device.write(f'\r{s}', end='\n')
@@ -74,8 +90,8 @@ class TrainingLoop:
             for cb in self._callbacks:
                 cb.on_epoch(epoch)
 
-    def _format_epoch_info(self, epoch, loss):
-        return f'Epoch {epoch:4} finished. Loss {loss:7.2f} nats.'
+    def _format_epoch_info(self, epoch, loss, val_loss):
+        return f'Epoch {epoch:4} finished. Loss {loss:7.2f} nats, val. loss {val_loss:7.2f}.'
 
     def set_training_task(self, task):
         self._trainer = task

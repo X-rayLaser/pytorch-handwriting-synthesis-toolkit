@@ -89,7 +89,7 @@ class PaddedSequencesBatchTests(unittest.TestCase):
 
 class VisualizationTests(unittest.TestCase):
     def setUp(self):
-        factory = IAMonDBProviderFactory('../../iam_ondb_home', 2)
+        factory = IAMonDBProviderFactory(num_examples=2, iam_home='../../iam_ondb_home')
         provider = factory.train_data_provider
 
         self.steps = 700

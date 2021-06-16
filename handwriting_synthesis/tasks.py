@@ -8,6 +8,9 @@ class TrainingTask:
     def train(self, batch):
         return 0, 0
 
+    def compute_loss(self, batch):
+        return 0, 0
+
 
 class DummyTask(TrainingTask):
     def __init__(self, hardcoded_loss=0.232):
@@ -28,9 +31,15 @@ class BaseHandwritingTask(TrainingTask):
         )
 
     def train(self, batch):
-        # todo: write metrics code
-
         self._optimizer.zero_grad()
+        y_hat, loss = self.compute_loss(batch)
+        loss.backward()
+        #model.clip_gradient()
+        self._optimizer.step()
+
+        return y_hat, loss
+
+    def compute_loss(self, batch):
         inputs, ground_true = self.prepare_batch(batch)
 
         y_hat = self._model(*inputs)
@@ -38,11 +47,6 @@ class BaseHandwritingTask(TrainingTask):
 
         y_hat = (mixtures, eos_hat)
         loss = losses.nll_loss(mixtures, eos_hat, ground_true)
-
-        loss.backward()
-        #model.clip_gradient()
-        self._optimizer.step()
-
         return y_hat, loss
 
     def get_model(self, device):
@@ -82,3 +86,6 @@ class HandwritingSynthesisTask(HandwritingPredictionTrainingTask):
         tensor = transcriptions_to_tensor(transcriptions)
         tensor = tensor.to(device=self._device)
         return (tensor,)
+
+
+# todo: redesign

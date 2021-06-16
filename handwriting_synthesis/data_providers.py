@@ -3,6 +3,9 @@ import iam_ondb
 
 class DataProviderFactory:
     def __init__(self, num_examples):
+        # todo: accept training_size and validation_size instead
+        # todo: pull up the implementation of properties here
+        # todo: abstract get_generator method
         self._num_examples = num_examples
 
     @property
@@ -15,9 +18,11 @@ class DataProviderFactory:
 
 
 class IAMonDBProviderFactory(DataProviderFactory):
-    def __init__(self, num_examples):
+    def __init__(self, num_examples, iam_home=None):
         super().__init__(num_examples)
-        iam_home = '../iam_ondb_home'
+
+        if iam_home is None:
+            iam_home = '../iam_ondb_home'
         train_fraction = 0.8
 
         db = iam_ondb.IAMonDB(iam_home)
