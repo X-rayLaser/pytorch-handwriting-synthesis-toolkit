@@ -102,6 +102,54 @@ def save_to_h5(data, save_path, max_length):
             if (i + 1) % 250 == 0:
                 print(f'Prepared {i + 1} examples')
 
+    mu = compute_mu(save_path)
+    std = compute_std(mu, save_path)
+
+    with h5py.File(save_path, 'a') as f:
+        ds_sequences = f['sequences']
+        ds_sequences.attrs['mu'] = mu
+        ds_sequences.attrs['std'] = std
+
+
+def compute_mu(h5_path):
+    with h5py.File(h5_path, 'r') as f:
+        ds_lengths = f['lengths']
+        num_examples = len(ds_lengths)
+
+        s = np.zeros(3, dtype=np.float32)
+        n = 0
+        for i in range(num_examples):
+            sequence, _ = load_from_h5(f, i)
+            a = np.array(sequence)
+            s += a.sum(axis=0)
+            n += len(a)
+
+        mu = s / n
+        mu[2] = 0.
+        return mu
+
+
+def compute_std(mu, h5_path):
+    with h5py.File(h5_path, 'r') as f:
+        ds_lengths = f['lengths']
+        num_examples = len(ds_lengths)
+
+        squared_sum = np.zeros(3, dtype=np.float32)
+
+        n = 0
+        for i in range(num_examples):
+            sequence, _ = load_from_h5(f, i)
+            a = np.array(sequence)
+
+            spreads = (a - mu) ** 2
+            squared_sum += spreads.sum(axis=0)
+            n += len(a)
+
+        variance = squared_sum / n
+        std = np.sqrt(variance)
+        std[2] = 1.
+        return std
+
 
 class H5Dataset(torch.utils.data.Dataset):
     def __init__(self, path):
@@ -109,12 +157,16 @@ class H5Dataset(torch.utils.data.Dataset):
         self._path = path
         self._fd = h5py.File(self._path, 'r')
         ds_lengths = self._fd['lengths']
+        ds_sequences = self._fd['sequences']
+
         self._num_examples = len(ds_lengths)
+        self._max_len = ds_sequences.attrs['max_length']
+        self._means = ds_sequences.attrs['mu']
+        self._stds = ds_sequences.attrs['std']
 
     @property
     def max_length(self):
-        ds_sequences = self._fd['sequences']
-        return ds_sequences.attrs['max_length']
+        return self._max_len
 
     def close(self):
         self._fd.close()
@@ -135,17 +187,11 @@ class H5Dataset(torch.utils.data.Dataset):
 
     @property
     def mu(self):
-        # todo: replace with memory efficient implementation
-        sequences = self._get_all_points()
-        means = np.mean(sequences, axis=0)
-        return means[0], means[1], 0.
+        return tuple(self._means)
 
     @property
     def std(self):
-        # todo: replace with memory efficient implementation
-        sequences = self._get_all_points()
-        stds = np.std(sequences, axis=0)
-        return stds[0], stds[1], 1.
+        return tuple(self._stds)
 
     def _get_all_points(self):
         sequences = []

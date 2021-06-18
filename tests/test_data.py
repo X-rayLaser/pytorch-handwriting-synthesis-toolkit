@@ -204,14 +204,14 @@ class H5Tests(unittest.TestCase):
 
         data.save_to_h5(dataset, self.h5_path, max_length=5)
 
-        expected_mu = (1 / 3., 5 / 3., 0)
-        std_array = np.array(seq).std(axis=0)
+        expected_mu = tuple(np.array([1 / 3., 5 / 3., 0.], dtype=np.float32))
+        std_array = np.array(seq, dtype=np.float32).std(axis=0)
         expected_std = (std_array[0], std_array[1], 1.)
 
         h5_dataset = data.H5Dataset(self.h5_path)
 
-        self.assertEqual(expected_mu, h5_dataset.mu)
-        self.assertEqual(expected_std, h5_dataset.std)
+        self.assertTupleAlmostEqual(expected_mu, h5_dataset.mu, places=6)
+        self.assertTupleAlmostEqual(expected_std, h5_dataset.std, places=6)
 
     def test_mu_and_2_sequences(self):
         seq1 = [[0., 0., 0.], [2., 4., 0.], [-1., 1., 1.]]
@@ -229,14 +229,51 @@ class H5Tests(unittest.TestCase):
 
         data.save_to_h5(dataset, self.h5_path, max_length=5)
 
-        expected_mu = (- 1 / 5., 6 / 5., 0)
-        std_array = np.array(flatten).std(axis=0)
+        expected_mu = tuple(np.array([- 1 / 5., 6 / 5., 0.], dtype=np.float32))
+        std_array = np.array(flatten, dtype=np.float32).std(axis=0)
         expected_std = (std_array[0], std_array[1], 1.)
 
         h5_dataset = data.H5Dataset(self.h5_path)
 
-        self.assertEqual(expected_mu, h5_dataset.mu)
-        self.assertEqual(expected_std, h5_dataset.std)
+        self.assertTupleAlmostEqual(expected_mu, h5_dataset.mu, places=8)
+        self.assertTupleAlmostEqual(expected_std, h5_dataset.std, places=8)
+
+    def test_mu_and_std_on_random_sequences(self):
+        shape1 = (15, 3)
+        shape2 = (12, 3)
+        shape3 = (8, 3)
+        shape4 = (1, 3)
+        min_int = -5
+        max_int = 5
+
+        np.random.seed(1)
+        a1 = np.random.randint(min_int, max_int, shape1)
+        a2 = np.random.randint(min_int, max_int, shape2)
+        a3 = np.random.randint(min_int, max_int, shape3)
+        a4 = np.random.randint(min_int, max_int, shape4)
+
+        a = np.concatenate([a1, a2, a3, a4])
+
+        sequences = [a1.tolist(), a2.tolist(), a3.tolist(), a4.tolist()]
+        texts = ['text1', 'text2', 'text3', 'text4']
+
+        dataset = list(zip(sequences, texts))
+
+        data.save_to_h5(dataset, self.h5_path, max_length=15)
+
+        expected_mu = a.mean(axis=0)
+        expected_mu = (expected_mu[0], expected_mu[1], 0.)
+        expected_std = a.std(axis=0)
+        expected_std = (expected_std[0], expected_std[1], 1.)
+
+        h5_dataset = data.H5Dataset(self.h5_path)
+        self.assertTupleAlmostEqual(expected_mu, h5_dataset.mu, places=6)
+        self.assertTupleAlmostEqual(expected_std, h5_dataset.std, places=6)
+
+    def assertTupleAlmostEqual(self, t1, t2, places):
+        n = len(t1)
+        for i in range(n):
+            self.assertAlmostEqual(t1[i], t2[i], places)
 
     #def test_point_stream_on_empty_list(self):
     #    self.assertRaises(BadStrokeSequenceError, lambda: list(points_stream([])))
