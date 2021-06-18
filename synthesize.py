@@ -5,7 +5,7 @@ import torch
 
 import handwriting_synthesis.callbacks
 import handwriting_synthesis.tasks
-from handwriting_synthesis import data, utils, training
+from handwriting_synthesis import data, utils
 
 
 if __name__ == '__main__':
@@ -50,6 +50,4 @@ if __name__ == '__main__':
         synthesizer.synthesize(c, output_path, show_attention=args.show_weights)
         print(f'Done {i} / {args.trials}')
 
-
-# todo: replace &quote; and other similar quoted characters with unicode characters
 # todo: reimplement tokenizer (based alphabet file and fit on data)

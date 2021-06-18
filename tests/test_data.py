@@ -350,11 +350,19 @@ class TextCleaningTests(unittest.TestCase):
 
 
 class TokenizerTests(unittest.TestCase):
-    def test(self):
-        tokenizer = data.Tokenizer()
+    def test_can_tokenize_and_detokenize(self):
+        charset = 'Helo wrld'
+        tokenizer = data.Tokenizer(charset)
         s = 'Hello world'
         tokens = tokenizer.tokenize(s)
         self.assertEqual(len(s), len(tokens))
 
         reconstructed = tokenizer.detokenize(tokens)
         self.assertEqual(s, reconstructed)
+
+    def test_tokenize_unknown_character(self):
+        chardet = 'abc'
+        tokenizer = data.Tokenizer(chardet)
+
+        tokens = tokenizer.tokenize('abcd')
+        self.assertEqual([1, 2, 3, 0], tokens)

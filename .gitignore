@@ -7,4 +7,5 @@ checkpoints/
 *.jpg
 *.log
 *.zip
+*.h5
 iam_ondb/

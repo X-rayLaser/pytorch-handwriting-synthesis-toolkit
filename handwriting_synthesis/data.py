@@ -271,6 +271,23 @@ def get_max_sequence_length(data_provider):
     return max_length
 
 
+def build_charset(lines_generator):
+    return ''
+
+
+def build_and_save_charset(dataset_path, charset_path):
+    dataset = H5Dataset(dataset_path)
+
+    def gen():
+        for i in range(len(dataset)):
+            _, text = dataset[i]
+            yield text
+
+    lines_generator = gen()
+    charset = build_charset(lines_generator)
+    Tokenizer(charset).save_charset(charset_path)
+
+
 def clean_text(s):
     """
     Substitutes special text codes for a character with an actual character.
@@ -292,35 +309,31 @@ def build_dataset(data_provider, save_path, max_length):
 
 
 class Tokenizer:
-    def __init__(self):
-        self.chr_to_int = defaultdict(int)
-        self.int_to_chr = {}
+    @classmethod
+    def from_file(cls, path):
+        pass
 
-        for code in range(ord('A'), ord('Z') + 1):
-            token = 1 + code - ord('A')
-            ch = chr(code)
-            self.chr_to_int[ch] = token
-            self.int_to_chr[token] = ch
+    def __init__(self, charset):
+        self._chr_to_int = defaultdict(int)
+        self._int_to_chr = {}
 
-        for code in range(ord('a'), ord('z') + 1):
-            token = 1 + ord('Z') - ord('A') + 1 + code - ord('a')
-            ch = chr(code)
-            self.chr_to_int[ch] = token
-            self.int_to_chr[token] = ch
-
-        self.chr_to_int[' '] = 53
-        self.int_to_chr[53] = ' '
+        for i, ch in enumerate(charset):
+            self._int_to_chr[i + 1] = ch
+            self._chr_to_int[ch] = i + 1
 
     @property
     def size(self):
         num_special_characters = 1
-        return len(self.chr_to_int) + num_special_characters
+        return len(self._chr_to_int) + num_special_characters
 
     def tokenize(self, s):
-        return [self.chr_to_int[ch] for ch in s]
+        return [self._chr_to_int[ch] for ch in s]
 
     def detokenize(self, tokens):
-        return ''.join([self.int_to_chr.get(token, '<Unknown_token>') for token in tokens])
+        return ''.join([self._int_to_chr.get(token, '') for token in tokens])
+
+    def save_charset(self, path):
+        pass
 
 
 class BadStrokeSequenceError(Exception):
