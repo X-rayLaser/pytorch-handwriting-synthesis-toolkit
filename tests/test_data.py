@@ -280,6 +280,42 @@ class H5Tests(unittest.TestCase):
     #    self.assertRaises(BadStrokeSequenceError, lambda: list(points_stream([[], []])))
 
 
+class MaxPointsSequenceLengthTests(unittest.TestCase):
+    def test_on_single_one_stroke_sequence(self):
+        points = [
+            [[(3, 5), (4, 4), (1, -1)]]
+        ]
+        texts = ['']
+
+        data_provider = zip(points, texts)
+        expected = 3
+        actual = data.get_max_sequence_length(data_provider)
+        self.assertEqual(expected, actual)
+
+    def test_on_single_multiple_stroke_sequence(self):
+        stroke1 = [(3, 5), (4, 4)]
+        stroke2 = [(1, -1)]
+        points = [[stroke1, stroke2]]
+        texts = ['']
+
+        data_provider = zip(points, texts)
+        expected = 3
+        actual = data.get_max_sequence_length(data_provider)
+        self.assertEqual(expected, actual)
+
+    def test_on_few_sequences(self):
+        seq1 = [[(3, 5), (4, 4)], [(1, -1)]]
+        seq2 = [[(1, 1)]]
+        seq3 = [[(3, 5), (4, 4)], [(1, -1), (12, 12)]]
+        points = [seq1, seq2, seq3]
+        texts = ['text1', 'text2', 'text3']
+
+        data_provider = zip(points, texts)
+        expected = 4
+        actual = data.get_max_sequence_length(data_provider)
+        self.assertEqual(expected, actual)
+
+
 class TokenizerTests(unittest.TestCase):
     def test(self):
         tokenizer = data.Tokenizer()

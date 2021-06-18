@@ -255,6 +255,21 @@ def preprocess_data(data_provider, max_length):
         yield offsets, text
 
 
+def get_max_sequence_length(data_provider):
+    max_length = 0
+
+    for i, (strokes, _) in enumerate(data_provider):
+        points = flatten_strokes(strokes)
+        seq_length = len(points)
+        max_length = max(max_length, seq_length)
+
+        num_checked = i + 1
+        if num_checked % 250 == 0:
+            print(f'\rChecked {num_checked} sequences', end='')
+    print()
+    return max_length
+
+
 def build_dataset(data_provider, save_path, max_length):
     generator = preprocess_data(data_provider, max_length)
     save_to_h5(generator, save_path, max_length)
