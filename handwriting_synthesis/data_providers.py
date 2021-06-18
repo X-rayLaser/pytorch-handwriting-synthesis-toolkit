@@ -1,13 +1,7 @@
 import iam_ondb
 
 
-class DataProviderFactory:
-    def __init__(self, num_examples):
-        # todo: accept training_size and validation_size instead
-        # todo: pull up the implementation of properties here
-        # todo: abstract get_generator method
-        self._num_examples = num_examples
-
+class Factory:
     @property
     def train_data_provider(self):
         raise NotImplementedError
@@ -17,42 +11,62 @@ class DataProviderFactory:
         raise NotImplementedError
 
 
-class IAMonDBProviderFactory(DataProviderFactory):
-    def __init__(self, num_examples, iam_home=None):
-        super().__init__(num_examples)
+class DataSplittingFactory(Factory):
+    def __init__(self, iterator, training_data_size, validation_data_size=0):
+        self._train_size = training_data_size
+        self._val_size = validation_data_size
+        self._num_examples = self._train_size + self._val_size
+        self._iterator = iterator
 
-        if iam_home is None:
-            iam_home = '../iam_ondb_home'
-        train_fraction = 0.8
-
-        db = iam_ondb.IAMonDB(iam_home)
-        it = iam_ondb.bounded_iterator(db, num_examples)
-
-        self._iterator = it.__iter__()
-
-        self._train_size = int(num_examples * train_fraction)
-        self._val_size = num_examples - self._train_size
-
+        self._num_train_yielded = 0
         self._iterated_train = False
 
     @property
     def train_data_provider(self):
-        for example in self._iterate(0, self._train_size):
-            yield example
-
         self._iterated_train = True
+
+        for _ in range(self._train_size):
+            yield next(self._iterator)
+            self._num_train_yielded += 1
 
     @property
     def val_data_provider(self):
         if not self._iterated_train:
             raise Exception('You have to iterate over training data before iterating over validation data')
 
-        for example in self._iterate(self._train_size, self._num_examples):
-            yield example
+        if self._num_train_yielded != self._train_size:
+            raise Exception(f'Not enough examples in iterator. Expected to yield {self._train_size} '
+                            f'training examples, but yielded {self._num_train_yielded}.')
 
-    def _iterate(self, start, end):
-        for i in range(start, end):
-            strokes, _, text = next(self._iterator)
+        if self._val_size:
+            for _ in range(self._val_size):
+                yield next(self._iterator)
+        else:
+            # yield remaining examples
+            try:
+                while True:
+                    yield next(self._iterator)
+            except StopIteration:
+                print('Stop iteration')
+
+
+class IAMonDBProviderFactory(DataSplittingFactory):
+    def __init__(self, training_data_size, validation_data_size=0, iam_home=None):
+        if iam_home is None:
+            iam_home = '../iam_ondb_home'
+
+        iterator = self.get_generator(training_data_size, validation_data_size, iam_home)
+        super().__init__(iterator, training_data_size, validation_data_size)
+
+    def get_generator(self, training_data_size, validation_data_size, iam_home):
+        db = iam_ondb.IAMonDB(iam_home)
+        if validation_data_size:
+            num_examples = training_data_size + validation_data_size
+            it = iam_ondb.bounded_iterator(db, num_examples)
+        else:
+            it = db.__iter__()
+
+        for strokes, _, text in it:
             strokes = self._remove_time_components(strokes)
             yield strokes, text
 

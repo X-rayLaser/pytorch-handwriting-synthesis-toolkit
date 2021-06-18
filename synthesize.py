@@ -51,5 +51,7 @@ if __name__ == '__main__':
         print(f'Done {i} / {args.trials}')
 
 
-# todo: cache mu, sd
-# todo: move normalization parameters inside a model
+# todo: calculate mu, sd values when preparing the dataset
+# todo: option to train on complete sequences instead of truncating them to 700 points
+# todo: replace &quote; and other similar quoted characters with unicode characters
+# todo: reimplement tokenizer (based alphabet file and fit on data)
