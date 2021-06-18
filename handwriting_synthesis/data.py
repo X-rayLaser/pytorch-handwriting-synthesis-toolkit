@@ -1,3 +1,4 @@
+import re
 from collections import defaultdict
 import h5py
 import numpy as np
@@ -268,6 +269,21 @@ def get_max_sequence_length(data_provider):
             print(f'\rChecked {num_checked} sequences', end='')
     print()
     return max_length
+
+
+def clean_text(s):
+    """
+    Substitutes special text codes for a character with an actual character.
+
+    :param s: text string
+    :return: text string
+    """
+    apostrophe = re.compile('&apos;')
+    quote = re.compile('&quot;')
+
+    s = apostrophe.sub("'", s)
+
+    return quote.sub('"', s)
 
 
 def build_dataset(data_provider, save_path, max_length):

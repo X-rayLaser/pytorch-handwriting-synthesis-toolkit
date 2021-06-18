@@ -1,4 +1,5 @@
 import iam_ondb
+from .data import clean_text
 
 
 class Factory:
@@ -68,6 +69,7 @@ class IAMonDBProviderFactory(DataSplittingFactory):
 
         for strokes, _, text in it:
             strokes = self._remove_time_components(strokes)
+            text = clean_text(text)
             yield strokes, text
 
     def _remove_time_components(self, strokes):

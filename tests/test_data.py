@@ -316,6 +316,39 @@ class MaxPointsSequenceLengthTests(unittest.TestCase):
         self.assertEqual(expected, actual)
 
 
+class TextCleaningTests(unittest.TestCase):
+    def test_can_process_one_apostrophe(self):
+        s = "It&apos;s just a text"
+        actual = data.clean_text(s)
+        expected = "It's just a text"
+        self.assertEqual(expected, actual)
+
+    def test_can_process_two_apostrophes(self):
+        s = "It&apos;s just a text. And here&apos;s another one."
+        actual = data.clean_text(s)
+        expected = "It's just a text. And here's another one."
+        self.assertEqual(expected, actual)
+
+    def test_can_process_one_quote_code(self):
+        s = '&quot;This is a simple unclosed quote.'
+
+        actual = data.clean_text(s)
+        expected = '"This is a simple unclosed quote.'
+        self.assertEqual(expected, actual)
+
+    def test_can_process_2_quote_codes(self):
+        s = 'He said: &quot;something!&quot;'
+        actual = data.clean_text(s)
+        expected = 'He said: "something!"'
+        self.assertEqual(expected, actual)
+
+    def test_can_process_both_apostrophe_and_quotations(self):
+        s = 'He said: &quot;That&apos;s something!&quot;'
+        actual = data.clean_text(s)
+        expected = '''He said: "That's something!"'''
+        self.assertEqual(expected, actual)
+
+
 class TokenizerTests(unittest.TestCase):
     def test(self):
         tokenizer = data.Tokenizer()
