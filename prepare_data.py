@@ -43,3 +43,7 @@ if __name__ == '__main__':
 
     data.build_dataset(factory.val_data_provider, val_save_path, max_len)
     print('Prepared validation data')
+
+    charset_path = os.path.join(save_dir, 'charset.txt')
+    data.build_and_save_charset(train_save_path, charset_path)
+    print(f'Charset is saved to {charset_path}')

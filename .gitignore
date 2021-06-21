@@ -8,4 +8,5 @@ checkpoints/
 *.log
 *.zip
 *.h5
+charset.txt
 iam_ondb/

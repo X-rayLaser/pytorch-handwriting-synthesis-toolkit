@@ -3,9 +3,7 @@ import os
 import argparse
 import torch
 
-import handwriting_synthesis.callbacks
-import handwriting_synthesis.tasks
-from handwriting_synthesis import data, utils
+from handwriting_synthesis import data, utils, models, callbacks
 
 
 if __name__ == '__main__':
@@ -27,14 +25,20 @@ if __name__ == '__main__':
     args = parser.parse_args()
     stochastic = not args.deterministic
 
+    charset_path = os.path.join(args.data_dir, 'charset.txt')
+    tokenizer = data.Tokenizer.from_file(charset_path)
+    alphabet_size = tokenizer.size
+
     device = torch.device("cpu")
-    model = handwriting_synthesis.tasks.HandwritingSynthesisTask(device)._model
+
+    model = models.SynthesisNetwork.get_default_model(alphabet_size, device)
+    model = model.to(device)
 
     base_file_name = re.sub('[^0-9a-zA-Z]+', '_', args.text)
 
     model.load_state_dict(torch.load(args.path, map_location=device))
 
-    c = handwriting_synthesis.callbacks.transcriptions_to_tensor([args.text])
+    c = callbacks.transcriptions_to_tensor(tokenizer, [args.text])
 
     with data.H5Dataset(f'{args.data_dir}/train.h5') as dataset:
         mu = torch.tensor(dataset.mu)

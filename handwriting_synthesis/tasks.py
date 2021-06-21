@@ -21,9 +21,9 @@ class DummyTask(TrainingTask):
 
 
 class BaseHandwritingTask(TrainingTask):
-    def __init__(self, device):
+    def __init__(self, device, model):
         self._device = device
-        self._model = self.get_model(device)
+        self._model = model
         self._model = self._model.to(self._device)
         self._optimizer = CustomRMSprop(
             self._model.parameters(), lr=0.0001, alpha=0.95, eps=10 ** (-4),
@@ -49,13 +49,6 @@ class BaseHandwritingTask(TrainingTask):
         loss = losses.nll_loss(mixtures, eos_hat, ground_true)
         return y_hat, loss
 
-    def get_model(self, device):
-        raise NotImplementedError
-
-    def load_model_weights(self, path):
-        model, epochs = utils.load_saved_weights(self._model, path)
-        self._model = model.to(self._device)
-
     def prepare_batch(self, batch):
         points, transcriptions = batch
         ground_true = utils.PaddedSequencesBatch(points, device=self._device)
@@ -73,17 +66,16 @@ class BaseHandwritingTask(TrainingTask):
 
 
 class HandwritingPredictionTrainingTask(BaseHandwritingTask):
-    def get_model(self, device):
-        return models.HandwritingPredictionNetwork(3, 900, 20, device)
+    pass
 
 
 class HandwritingSynthesisTask(HandwritingPredictionTrainingTask):
-    def get_model(self, device):
-        alphabet_size = data.Tokenizer().size
-        return models.SynthesisNetwork(3, 400, alphabet_size, device)
+    def __init__(self, tokenizer, *args, **kwargs):
+        super(HandwritingSynthesisTask, self).__init__(*args, **kwargs)
+        self._tokenizer = tokenizer
 
     def get_extra_input(self, transcriptions):
-        tensor = transcriptions_to_tensor(transcriptions)
+        tensor = transcriptions_to_tensor(self._tokenizer, transcriptions)
         tensor = tensor.to(device=self._device)
         return (tensor,)
 

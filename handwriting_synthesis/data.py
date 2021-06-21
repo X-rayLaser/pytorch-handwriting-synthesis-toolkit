@@ -288,7 +288,16 @@ def build_and_save_charset(dataset_path, charset_path):
     def gen():
         for i in range(len(dataset)):
             _, text = dataset[i]
+
+            examples_done = i + 1
+            if examples_done % 250 == 0:
+                print(
+                    f'\rBuilding charset: processed {examples_done} of {len(dataset)} examples',
+                    end=''
+                )
             yield text
+
+        print()
 
     lines_generator = gen()
     charset = build_charset(lines_generator)

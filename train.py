@@ -1,16 +1,18 @@
 import argparse
+import os
+
 import torch
 
 import handwriting_synthesis.callbacks
 import handwriting_synthesis.tasks
 from handwriting_synthesis import training
-from handwriting_synthesis import data, utils
+from handwriting_synthesis import data, utils, models
 
 
 class ConfigOptions:
     def __init__(self, batch_size, epochs, sampling_interval,
                  num_train_examples, num_val_examples, max_length,
-                 model_path):
+                 model_path, charset_path):
         self.batch_size = batch_size
         self.epochs = epochs
         self.sampling_interval = sampling_interval
@@ -18,6 +20,7 @@ class ConfigOptions:
         self.num_val_examples = num_val_examples
         self.max_length = max_length
         self.model_path = model_path
+        self.charset_path = charset_path
 
 
 def print_info_message(training_task_verbose, config):
@@ -43,12 +46,15 @@ def train_model(train_set, val_set, train_task, callbacks, config, training_task
     loop.start(initial_epoch=largest_epoch, epochs=config.epochs)
 
 
-def train_unconditional_handwriting_generator(train_set, val_set, config):
-    train_task = handwriting_synthesis.tasks.HandwritingPredictionTrainingTask(device)
-    train_task.load_model_weights(config.model_path)
+def train_unconditional_handwriting_generator(train_set, val_set, device, config):
+    model = models.HandwritingPredictionNetwork.get_default_model(device)
+    model, epochs = utils.load_saved_weights(model, config.model_path)
+    model = model.to(device)
+
+    train_task = handwriting_synthesis.tasks.HandwritingPredictionTrainingTask(device, model)
 
     cb = handwriting_synthesis.callbacks.HandwritingGenerationCallback(
-        train_task._model, 'samples', max_length,
+        model, 'samples', max_length,
         train_set, iteration_interval=config.sampling_interval
     )
 
@@ -56,13 +62,19 @@ def train_unconditional_handwriting_generator(train_set, val_set, config):
                 training_task_verbose='Training (unconditional) handwriting prediction model')
 
 
-def train_handwriting_synthesis_model(train_set, val_set, config):
-    train_task = handwriting_synthesis.tasks.HandwritingSynthesisTask(device)
-    train_task.load_model_weights(config.model_path)
+def train_handwriting_synthesis_model(train_set, val_set, device, config):
+    tokenizer = data.Tokenizer.from_file(config.charset_path)
+
+    alphabet_size = tokenizer.size
+    model = models.SynthesisNetwork.get_default_model(alphabet_size, device)
+    model, epochs = utils.load_saved_weights(model, config.model_path)
+
+    train_task = handwriting_synthesis.tasks.HandwritingSynthesisTask(tokenizer, device, model)
 
     cb = handwriting_synthesis.callbacks.HandwritingSynthesisCallback(
+        tokenizer,
         10,
-        train_task._model, 'synthesized', max_length,
+        model, 'synthesized', max_length,
         train_set, iteration_interval=config.sampling_interval
     )
 
@@ -91,8 +103,8 @@ if __name__ == '__main__':
     parser.add_argument("data_dir", type=str, help="Directory containing training and validation data h5 files")
     parser.add_argument("model_dir", type=str, help="Directory storing model weights")
     parser.add_argument(
-        "-s", "--synthesis", default=False, action="store_true",
-        help="Whether or not to train synthesis network (unconditional prediction network is trained by default)"
+        "-u", "--unconditional", default=False, action="store_true",
+        help="Whether or not to train synthesis network (synthesis network is trained by default)"
     )
     parser.add_argument("-b", "--batch_size", type=int, default=32, help="Batch size")
     parser.add_argument("-e", "--epochs", type=int, default=100, help="# of epochs to train")
@@ -108,8 +120,12 @@ if __name__ == '__main__':
         mu = dataset.mu
         sd = dataset.std
 
-    with data.NormalizedDataset(f'{args.data_dir}/train.h5', mu, sd) as train_set, \
-            data.NormalizedDataset(f'{args.data_dir}/val.h5', mu, sd) as val_set:
+    train_dataset_path = os.path.join(args.data_dir, 'train.h5')
+    val_dataset_path = os.path.join(args.data_dir, 'val.h5')
+    charset_path = os.path.join(args.data_dir, 'charset.txt')
+
+    with data.NormalizedDataset(train_dataset_path, mu, sd) as train_set, \
+            data.NormalizedDataset(val_dataset_path, mu, sd) as val_set:
         num_train_examples = len(train_set)
         num_val_examples = len(val_set)
         max_length = train_set.max_length
@@ -118,9 +134,10 @@ if __name__ == '__main__':
         config = ConfigOptions(batch_size=args.batch_size, epochs=args.epochs,
                                sampling_interval=args.interval, num_train_examples=num_train_examples,
                                num_val_examples=num_val_examples, max_length=max_length,
-                               model_path=model_path)
+                               model_path=model_path,
+                               charset_path=charset_path)
 
-        if args.synthesis:
-            train_handwriting_synthesis_model(train_set, val_set, config)
+        if args.unconditional:
+            train_unconditional_handwriting_generator(train_set, val_set, device, config)
         else:
-            train_unconditional_handwriting_generator(train_set, val_set, config)
+            train_handwriting_synthesis_model(train_set, val_set, device, config)

@@ -116,6 +116,10 @@ class SoftWindow(jit.ScriptModule):
 
 
 class SynthesisNetwork(jit.ScriptModule):
+    @classmethod
+    def get_default_model(cls, alphabet_size, device):
+        return cls(3, 400, alphabet_size, device)
+
     def __init__(self, input_size, hidden_size, alphabet_size, device, gaussian_components=10, output_mixtures=20):
         super().__init__()
 
@@ -271,6 +275,10 @@ class MixtureDensityLayer(nn.Module):
 
 
 class HandwritingPredictionNetwork(nn.Module):
+    @classmethod
+    def get_default_model(cls, device):
+        return cls(3, 900, 20, device)
+
     def __init__(self, input_size, hidden_size, num_components, device=None):
         super().__init__()
         self.input_size = input_size

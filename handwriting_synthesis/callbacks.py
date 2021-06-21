@@ -4,9 +4,7 @@ import torch
 from handwriting_synthesis import data, utils
 
 
-def transcriptions_to_tensor(transcriptions):
-    tokenizer = data.Tokenizer()
-
+def transcriptions_to_tensor(tokenizer, transcriptions):
     eye = torch.eye(tokenizer.size)
 
     token_sequences = []
@@ -102,9 +100,10 @@ class HandwritingGenerationCallback(Callback):
 
 
 class HandwritingSynthesisCallback(HandwritingGenerationCallback):
-    def __init__(self, images_per_iterations=10, *args, **kwargs):
+    def __init__(self, tokenizer, images_per_iterations=10, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.images_per_iteration = images_per_iterations
+        self.tokenizer = tokenizer
 
         self.mu = torch.tensor(self.train_set.mu)
         self.std = torch.tensor(self.train_set.std)
@@ -118,7 +117,7 @@ class HandwritingSynthesisCallback(HandwritingGenerationCallback):
 
             name = re.sub('[^0-9a-zA-Z]+', '_', transcription)
             file_name = f'{name}.png'
-            context = transcriptions_to_tensor(transcription_batch)
+            context = transcriptions_to_tensor(self.tokenizer, transcription_batch)
             res.append((file_name, context))
 
         return res
