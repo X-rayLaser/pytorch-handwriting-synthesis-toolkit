@@ -350,8 +350,24 @@ class TextCleaningTests(unittest.TestCase):
 
 
 class TokenizerTests(unittest.TestCase):
+    def test_cannot_use_charset_with_non_unique_characters(self):
+        self.assertRaises(data.BadCharsetError, lambda: data.Tokenizer(charset='abcda'))
+
+    def test_tokenize_and_detokenize_empty_string(self):
+        charset = 'Helo wrd'
+        tokenizer = data.Tokenizer(charset)
+        tokens = tokenizer.tokenize('')
+        self.assertEqual([], tokens)
+        s = tokenizer.detokenize(tokens)
+        self.assertEqual('', s)
+
+    def test_can_tokenize_using_empty_charset(self):
+        s = 'Test'
+        tokenizer = data.Tokenizer(charset='')
+        self.assertEqual([0] * len(s), tokenizer.tokenize(s))
+
     def test_can_tokenize_and_detokenize(self):
-        charset = 'Helo wrld'
+        charset = 'Helo wrd'
         tokenizer = data.Tokenizer(charset)
         s = 'Hello world'
         tokens = tokenizer.tokenize(s)
@@ -361,8 +377,135 @@ class TokenizerTests(unittest.TestCase):
         self.assertEqual(s, reconstructed)
 
     def test_tokenize_unknown_character(self):
-        chardet = 'abc'
-        tokenizer = data.Tokenizer(chardet)
+        charset = 'abc'
+        tokenizer = data.Tokenizer(charset)
 
         tokens = tokenizer.tokenize('abcd')
         self.assertEqual([1, 2, 3, 0], tokens)
+
+    def test_tokenizer_returns_correct_charset_size(self):
+        self.assertEqual(1, data.Tokenizer(charset='').size)
+
+        charset = 'abc'
+        tokenizer = data.Tokenizer(charset)
+        self.assertEqual(4, tokenizer.size)
+
+    def test_detokenize_unknown_tokens(self):
+        charset = 'a'
+        tokenizer = data.Tokenizer(charset)
+        actual = tokenizer.detokenize([454, 232, 1, 15])
+        expected = 'a'
+        self.assertEqual(expected, actual)
+
+    def test_can_work_with_unicode_strings(self):
+        text = 'こんにちは'
+        charset = str(text)
+        tokenizer = data.Tokenizer(charset)
+        tokens = tokenizer.tokenize(text)
+        self.assertEqual([1, 2, 3, 4, 5], tokens)
+        self.assertEqual(text, tokenizer.detokenize(tokens))
+
+
+class TokenizerSerializationTests(unittest.TestCase):
+    def setUp(self):
+        dir_path = 'temp_charsets'
+        if os.path.isdir(dir_path):
+            shutil.rmtree(dir_path)
+
+        os.makedirs(dir_path, exist_ok=True)
+        self.path = os.path.join(dir_path, 'temp_charset.txt')
+
+    def tearDown(self):
+        if os.path.isfile(self.path):
+            os.remove(self.path)
+
+    def test_can_save_and_load_tokenizer_from_file(self):
+        charset = 'abc'
+        self.assertCanSaveAndLoad(charset)
+
+    def test_on_nasty_charset(self):
+        charset = '''abc~!@#$%^&*()-+=[{}];:'"|\\/.,<>'''
+        self.assertCanSaveAndLoad(charset)
+
+    def test_can_save_unicode(self):
+        charset = ''.join(set('こんにちは'))
+        self.assertCanSaveAndLoad(charset)
+
+    def test_consistency(self):
+        charset = 'string'
+        data.Tokenizer(charset).save_charset(self.path)
+
+        text = str(charset)
+        expected_tokens = [1, 2, 3, 4, 5, 6]
+
+        for i in range(100):
+            tokenizer = data.Tokenizer.from_file(self.path)
+            tokens = tokenizer.tokenize(text)
+            self.assertEqual(expected_tokens, tokens)
+
+    def assertCanSaveAndLoad(self, charset):
+        tokenizer = data.Tokenizer(charset)
+        self.assertEqual(charset, tokenizer.charset)
+
+        tokenizer.save_charset(self.path)
+
+        tokenizer = data.Tokenizer.from_file(self.path)
+        self.assertEqual(charset, tokenizer.charset)
+
+
+class BuildCharSetTests(unittest.TestCase):
+    def test_using_empty_string_generator(self):
+        def lines():
+            yield ''
+            yield ''
+
+        g = lines()
+        charset = data.build_charset(g)
+        expected = ''
+        self.assertEqual(expected, charset)
+
+    def test_using_single_string_generator(self):
+        def lines():
+            yield 'aabbbcc'
+
+        expected = 'abc'
+        charset = data.build_charset(lines())
+        self.assertEqual(expected, charset)
+
+    def test_charset_should_be_sorted(self):
+        def lines():
+            yield 'cacabbzy'
+
+        expected = 'abcyz'
+        charset = data.build_charset(lines())
+        self.assertEqual(expected, charset)
+
+    def test_using_identical_strings(self):
+        def lines():
+            yield 'aabbbcc'
+            yield 'aabbbcc'
+
+        expected = 'abc'
+        charset = data.build_charset(lines())
+        self.assertEqual(expected, charset)
+
+    def test_using_multiple_distinct_strings(self):
+        def lines():
+            yield 'abbab'
+            yield 'zabbzct'
+            yield 'O'
+
+        expected = 'Oabctz'
+        charset = data.build_charset(lines())
+        self.assertEqual(expected, charset)
+
+    def test_build_charset_from_unicode_strings(self):
+        hello = 'こんにちは'
+
+        def lines():
+            yield hello
+            yield hello
+
+        expected = ''.join(sorted(hello))
+        charset = data.build_charset(lines())
+        self.assertEqual(expected, charset)

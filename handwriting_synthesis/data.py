@@ -272,7 +272,14 @@ def get_max_sequence_length(data_provider):
 
 
 def build_charset(lines_generator):
-    return ''
+    charset = set()
+
+    for text in lines_generator:
+        charset = charset.union(set(text))
+
+    characters = list(charset)
+    sorted_characters = sorted(characters)
+    return ''.join(sorted_characters)
 
 
 def build_and_save_charset(dataset_path, charset_path):
@@ -311,15 +318,28 @@ def build_dataset(data_provider, save_path, max_length):
 class Tokenizer:
     @classmethod
     def from_file(cls, path):
-        pass
+        with open(path, 'r') as f:
+            s = f.read()
+            return cls(s)
 
     def __init__(self, charset):
+        self._validate_charset(charset)
+        self._charset = charset
         self._chr_to_int = defaultdict(int)
         self._int_to_chr = {}
 
-        for i, ch in enumerate(charset):
+        for i, ch in enumerate(self._charset):
             self._int_to_chr[i + 1] = ch
             self._chr_to_int[ch] = i + 1
+
+    def _validate_charset(self, charset):
+        collapsed = ''.join(set(charset))
+        if len(collapsed) != len(charset):
+            raise BadCharsetError(f'Charset have to contain only unique characters: {charset}')
+
+    @property
+    def charset(self):
+        return str(self._charset)
 
     @property
     def size(self):
@@ -333,7 +353,12 @@ class Tokenizer:
         return ''.join([self._int_to_chr.get(token, '') for token in tokens])
 
     def save_charset(self, path):
-        pass
+        with open(path, 'w') as f:
+            f.write(self._charset)
+
+
+class BadCharsetError(Exception):
+    pass
 
 
 class BadStrokeSequenceError(Exception):
