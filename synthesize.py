@@ -3,6 +3,7 @@ import os
 import argparse
 import torch
 
+import handwriting_synthesis.data
 from handwriting_synthesis import data, utils, models, callbacks
 
 
@@ -38,7 +39,7 @@ if __name__ == '__main__':
 
     model.load_state_dict(torch.load(args.path, map_location=device))
 
-    c = callbacks.transcriptions_to_tensor(tokenizer, [args.text])
+    c = handwriting_synthesis.data.transcriptions_to_tensor(tokenizer, [args.text])
 
     with data.H5Dataset(f'{args.data_dir}/train.h5') as dataset:
         mu = torch.tensor(dataset.mu)
@@ -53,5 +54,3 @@ if __name__ == '__main__':
         output_path = os.path.join(output_dir, f'{base_file_name}_{i}.png')
         synthesizer.synthesize(c, output_path, show_attention=args.show_weights)
         print(f'Done {i} / {args.trials}')
-
-# todo: reimplement tokenizer (based alphabet file and fit on data)

@@ -1,6 +1,6 @@
 import torch
 from handwriting_synthesis import losses, utils, models, data
-from handwriting_synthesis.callbacks import transcriptions_to_tensor
+from handwriting_synthesis.data import transcriptions_to_tensor
 from handwriting_synthesis.optimizers import CustomRMSprop
 
 

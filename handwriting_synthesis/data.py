@@ -2,7 +2,10 @@ import re
 from collections import defaultdict
 import h5py
 import numpy as np
+import torch
 import torch.utils.data
+
+from handwriting_synthesis import utils
 
 
 def points_stream(strokes):
@@ -372,3 +375,15 @@ class BadCharsetError(Exception):
 
 class BadStrokeSequenceError(Exception):
     pass
+
+
+def transcriptions_to_tensor(tokenizer, transcriptions):
+    eye = torch.eye(tokenizer.size)
+
+    token_sequences = []
+    for s in transcriptions:
+        tokens = tokenizer.tokenize(s)
+        token_sequences.append(eye[tokens].numpy().tolist())
+
+    batch = utils.PaddedSequencesBatch(token_sequences)
+    return batch.tensor

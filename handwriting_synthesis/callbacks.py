@@ -1,19 +1,8 @@
 import os
 import re
 import torch
-from handwriting_synthesis import data, utils
-
-
-def transcriptions_to_tensor(tokenizer, transcriptions):
-    eye = torch.eye(tokenizer.size)
-
-    token_sequences = []
-    for s in transcriptions:
-        tokens = tokenizer.tokenize(s)
-        token_sequences.append(eye[tokens].numpy().tolist())
-
-    batch = utils.PaddedSequencesBatch(token_sequences)
-    return batch.tensor
+from handwriting_synthesis import utils
+from handwriting_synthesis.data import transcriptions_to_tensor
 
 
 class Callback:
