@@ -104,8 +104,9 @@ def save_to_h5(data, save_path, max_length):
             ds_texts[i] = text
 
             if (i + 1) % 250 == 0:
-                print(f'Prepared {i + 1} examples')
+                print(f'\rPrepared {i + 1} examples', end='')
 
+    print()
     mu = compute_mu(save_path)
     std = compute_std(mu, save_path)
 
@@ -128,6 +129,10 @@ def compute_mu(h5_path):
             s += a.sum(axis=0)
             n += len(a)
 
+            if (i + 1) % 250 == 0:
+                print(f'\rComputing mean: processed {i + 1} out of {num_examples} examples', end='')
+        print('\nComputed mean')
+
         mu = s / n
         mu[2] = 0.
         return mu
@@ -148,6 +153,10 @@ def compute_std(mu, h5_path):
             spreads = (a - mu) ** 2
             squared_sum += spreads.sum(axis=0)
             n += len(a)
+
+            if (i + 1) % 250 == 0:
+                print(f'\rComputing std: processed {i + 1} out of {num_examples} examples', end='')
+        print('\nComputed std')
 
         variance = squared_sum / n
         std = np.sqrt(variance)
@@ -286,19 +295,18 @@ def build_charset(lines_generator):
 
 
 def build_and_save_charset(dataset_path, charset_path):
-    dataset = H5Dataset(dataset_path)
-
     def gen():
-        for i in range(len(dataset)):
-            _, text = dataset[i]
+        with H5Dataset(dataset_path) as dataset:
+            for i in range(len(dataset)):
+                _, text = dataset[i]
 
-            examples_done = i + 1
-            if examples_done % 250 == 0:
-                print(
-                    f'\rBuilding charset: processed {examples_done} of {len(dataset)} examples',
-                    end=''
-                )
-            yield text
+                examples_done = i + 1
+                if examples_done % 250 == 0:
+                    print(
+                        f'\rBuilding charset: processed {examples_done} of {len(dataset)} examples',
+                        end=''
+                    )
+                yield text
 
         print()
 

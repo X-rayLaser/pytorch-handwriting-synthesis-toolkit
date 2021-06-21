@@ -48,7 +48,7 @@ class DataSplittingFactory(Factory):
                 while True:
                     yield next(self._iterator)
             except StopIteration:
-                print('Stop iteration')
+                pass
 
 
 class IAMonDBProviderFactory(DataSplittingFactory):
