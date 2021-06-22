@@ -108,7 +108,8 @@ def split_into_components(seq):
 
 def visualize_strokes(seq, save_path='img.png', lines=False):
     im = create_strokes_image(seq, lines)
-    im.save(save_path)
+    if im:
+        im.save(save_path)
 
 
 def create_strokes_image(seq, lines=False):

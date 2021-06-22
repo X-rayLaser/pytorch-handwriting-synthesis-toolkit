@@ -344,7 +344,7 @@ class Tokenizer:
 
     def __init__(self, charset):
         self._validate_charset(charset)
-        self._charset = charset
+        self._charset = str(charset)
         self._chr_to_int = defaultdict(int)
         self._int_to_chr = {}
 
@@ -364,7 +364,7 @@ class Tokenizer:
     @property
     def size(self):
         num_special_characters = 1
-        return len(self._chr_to_int) + num_special_characters
+        return len(self._charset) + num_special_characters
 
     def tokenize(self, s):
         return [self._chr_to_int[ch] for ch in s]

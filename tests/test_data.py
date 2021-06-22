@@ -405,6 +405,15 @@ class TokenizerTests(unittest.TestCase):
         self.assertEqual([1, 2, 3, 4, 5], tokens)
         self.assertEqual(text, tokenizer.detokenize(tokens))
 
+    def test_size_should_remain_unchanged(self):
+        charset = 'abcd'
+        tokenizer = data.Tokenizer(charset)
+        expected = 5
+        self.assertEqual(expected, tokenizer.size)
+
+        tokens = tokenizer.tokenize('abcdefgi')
+        self.assertEqual(expected, tokenizer.size)
+
 
 class TokenizerSerializationTests(unittest.TestCase):
     def setUp(self):

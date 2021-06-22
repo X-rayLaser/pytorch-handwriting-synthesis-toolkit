@@ -17,15 +17,15 @@ def collate(batch):
 def compute_validation_loss(trainer, dataset, batch_size):
     loader = DataLoader(dataset, batch_size, collate_fn=collate)
 
-    ma_loss = MovingAverage()
-    ma_loss.reset()
-
     with torch.no_grad():
+        ma_loss = MovingAverage()
+        ma_loss.reset()
+
         for i, data in enumerate(loader):
             y_hat, loss = trainer.compute_loss(data)
             ma_loss.update(loss)
 
-    return ma_loss.nats
+        return ma_loss.nats
 
 
 class TrainingLoop:
@@ -50,6 +50,7 @@ class TrainingLoop:
     def get_iterator(self, initial_epoch, epochs):
         loader = DataLoader(self._dataset, self._batch_size, collate_fn=collate)
         num_batches = math.ceil(len(self._dataset) / self._batch_size)
+        val_batch_size = min(self._batch_size, len(self._val_set))
 
         iteration = 0
 
@@ -73,7 +74,7 @@ class TrainingLoop:
                 iteration += 1
                 yield
 
-            val_loss_nats = compute_validation_loss(self._trainer, self._val_set, self._batch_size)
+            val_loss_nats = compute_validation_loss(self._trainer, self._val_set, val_batch_size)
             s = self._format_epoch_info(epoch, ma_loss.nats, val_loss_nats)
 
             self._run_epoch_callbacks(epoch)
