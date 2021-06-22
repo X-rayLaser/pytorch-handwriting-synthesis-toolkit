@@ -38,12 +38,19 @@ class Metric:
     def value(self):
         return self._ma.value
 
+    @property
+    def nats(self):
+        return self._ma.nats
+
     def update(self, y_hat, ground_true):
         metric = self.compute_metric(y_hat, ground_true)
         self._ma.update(metric)
 
     def compute_metric(self, y_hat, ground_true):
         raise NotImplemented
+
+    def reset(self):
+        self._ma.reset()
 
 
 class MSE(Metric):
@@ -52,4 +59,19 @@ class MSE(Metric):
         return 'MSE'
 
     def compute_metric(self, y_hat, ground_true):
-        return torch.nn.functional.mse_loss(y_hat, ground_true)
+        mixture, eos = ground_true.concatenate_predictions(y_hat)
+        pi, mu, sd, ro = mixture
+        num_components = pi.shape[-1]
+
+        component_indices = pi.argmax(-1).unsqueeze(1)
+
+        mu1 = mu[:, :num_components]
+        mu2 = mu[:, num_components:]
+
+        mu1 = mu1.gather(1, component_indices)
+        mu2 = mu2.gather(1, component_indices)
+
+        predictions = torch.cat([mu1, mu2, eos], dim=1)
+        actual = ground_true.concatenated()
+
+        return torch.nn.functional.mse_loss(predictions, actual)

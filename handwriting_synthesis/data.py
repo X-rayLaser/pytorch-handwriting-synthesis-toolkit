@@ -217,6 +217,7 @@ class H5Dataset(torch.utils.data.Dataset):
 class NormalizedDataset(H5Dataset):
     def __init__(self, path, mu, sd):
         super().__init__(path)
+        # todo: convert to tensors here
         self._mu = mu
         self._sd = sd
 

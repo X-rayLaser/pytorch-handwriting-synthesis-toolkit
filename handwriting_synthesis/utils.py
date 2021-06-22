@@ -82,6 +82,51 @@ class PaddedSequencesBatch:
         t = batch.reshape(self._batch_size * self._max_len, -1)
         return t[self.mask]
 
+    def concatenate_predictions(self, y_hat):
+        """
+        Similar to concatenate_batch, but applies the operation to every tensor
+        in the mixture density distribution as well as End-Of-Stroke tensor.
+
+        :param y_hat: tuple consisting of predicted parameters of mixture distribution and predictions for
+        End-Of-Stroke (eos_hat) flag.
+
+        Mixture itself is a tuple of 4 tensors: mixture probabilities (pi), means (mu), deviations (sd),
+        correlation coefficients (ro).
+
+        pi is a Pytorch 3D Tensor of shape (batch_size, number_of_steps, number_of_mixture_components)
+        mu is a Pytorch 3D Tensor of shape (batch_size, number_of_steps, 2 * number_of_mixture_components)
+        sd is a Pytorch 3D Tensor of shape (batch_size, number_of_steps, 2 * number_of_mixture_components)
+        ro is a Pytorch 3D Tensor of shape (batch_size, number_of_steps, number_of_mixture_components)
+
+        :return: tuple of concatenated mixture tensors and End-Of-Stroke tensor.
+        Every tensor now is 2D tensor.
+
+        """
+        mixture, eos_hat = y_hat
+        pi, mu, sd, ro = mixture
+
+        num_components = pi.shape[-1]
+        mu1 = mu[:, :, :num_components]
+        mu2 = mu[:, :, num_components:]
+
+        sd1 = sd[:, :, :num_components]
+        sd2 = sd[:, :, num_components:]
+
+        pi = self.concatenate_batch(pi)
+        mu1 = self.concatenate_batch(mu1)
+        mu2 = self.concatenate_batch(mu2)
+        mu = torch.cat([mu1, mu2], dim=1)
+
+        sd1 = self.concatenate_batch(sd1)
+        sd2 = self.concatenate_batch(sd2)
+        sd = torch.cat([sd1, sd2], dim=1)
+
+        ro = self.concatenate_batch(ro)
+
+        eos_hat = self.concatenate_batch(eos_hat)
+        packed_output = (pi, mu, sd, ro)
+        return packed_output, eos_hat
+
 
 class BadInputError(Exception):
     pass
