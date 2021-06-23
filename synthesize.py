@@ -39,13 +39,16 @@ if __name__ == '__main__':
 
     model.load_state_dict(torch.load(args.path, map_location=device))
 
-    c = handwriting_synthesis.data.transcriptions_to_tensor(tokenizer, [args.text])
+    sentinel = '\n'
+    c = handwriting_synthesis.data.transcriptions_to_tensor(tokenizer, [args.text + sentinel])
 
     with data.H5Dataset(f'{args.data_dir}/train.h5') as dataset:
         mu = torch.tensor(dataset.mu)
         sd = torch.tensor(dataset.std)
 
-    synthesizer = utils.HandwritingSynthesizer(model, mu, sd, num_steps=700, stochastic=stochastic)
+    synthesizer = utils.HandwritingSynthesizer(
+        model, mu, sd, num_steps=dataset.max_length, stochastic=stochastic
+    )
 
     output_dir = 'samples'
     os.makedirs(output_dir, exist_ok=True)

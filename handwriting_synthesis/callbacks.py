@@ -100,9 +100,10 @@ class HandwritingSynthesisCallback(HandwritingGenerationCallback):
     def get_names_with_contexts(self, iteration):
         images_per_iteration = min(len(self.train_set), self.images_per_iteration)
         res = []
+        sentinel = '\n'
         for i in range(images_per_iteration):
             _, transcription = self.train_set[i]
-            transcription_batch = [transcription]
+            transcription_batch = [transcription + sentinel]
 
             name = re.sub('[^0-9a-zA-Z]+', '_', transcription)
             file_name = f'{name}.png'

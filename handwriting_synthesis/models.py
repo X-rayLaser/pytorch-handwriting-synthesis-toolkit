@@ -87,7 +87,7 @@ class SoftWindow(jit.ScriptModule):
         :param x: tensor of shape (batch_size, 1, input_size)
         :param c: tensor of shape (batch_size, num_characters, alphabet_size)
         :param prev_k: tensor of shape (batch_size, num_components)
-        :return: window of shape (batch_size, 1, num_characters), k of shape (batch_size, num_components)
+        :return: phi (attention weights) of shape (batch_size, 1, num_characters), k of shape (batch_size, num_components)
         """
 
         x = x[:, 0]
@@ -216,17 +216,26 @@ class SynthesisNetwork(jit.ScriptModule):
             h1, hidden1 = self.lstm1(x_with_w, hidden1)
 
             phi, k = self.window(h1, c, k)
+            attention_weights.append(phi.squeeze(0))
+
             w = self.window.matmul_3d(phi, c)
 
             mixture, hidden2, hidden3 = self.compute_mixture(x, h1, w, hidden2, hidden3)
             mixture = self.squeeze(mixture)
             x_temp = self.get_mean_prediction(mixture, stochastic=stochastic).unsqueeze(0)
+
+            if self._is_end_of_string(phi, u):
+                x_temp[0, 2] = 1.0
+                outputs.append(x_temp)
+                break
+
             outputs.append(x_temp)
             x = x_temp.unsqueeze(0)
 
-            attention_weights.append(phi.squeeze(0))
-
         return torch.cat(outputs, dim=0), torch.cat(attention_weights, dim=0)
+
+    def _is_end_of_string(self, phi, string_length):
+        return phi[0, 0].argmax() == string_length - 1
 
     def squeeze(self, mixture: Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]):
         pi, mu, sd, ro, eos = mixture
