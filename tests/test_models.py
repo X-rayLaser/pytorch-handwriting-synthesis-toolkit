@@ -471,7 +471,9 @@ class SynthesisNetworkTests(unittest.TestCase):
         c = torch.ones(1, self.char_seq_size, self.alphabet_size)
         steps = 100
         outputs = self.model.sample_means(c, steps=steps)
-        self.assertTupleEqual((100, 3), outputs.shape)
+
+        self.assertLessEqual(outputs.shape[0], steps)
+        self.assertEqual(outputs.shape[1], 3)
 
 
 # todo: test synthesis network

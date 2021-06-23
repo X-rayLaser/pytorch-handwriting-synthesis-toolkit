@@ -63,11 +63,6 @@ class TrainingLoop:
         self._val_metrics = val_metrics or []
 
     def start(self, initial_epoch, epochs):
-        it = self.get_iterator(initial_epoch, epochs)
-        for _ in it:
-            pass
-
-    def get_iterator(self, initial_epoch, epochs):
         loader = DataLoader(self._dataset, self._batch_size, collate_fn=collate)
         num_batches = math.ceil(len(self._dataset) / self._batch_size)
         val_batch_size = min(self._batch_size, len(self._val_set))
@@ -90,22 +85,23 @@ class TrainingLoop:
                     self._compute_train_metrics(y_hat, points)
 
                 nats_loss = ma_loss.nats
-                train_metrics = self._format_metrics(self._train_metrics)
-                self._output_device.write(
-                    f'\rEpoch {epoch:4} {i + 1}/{num_batches} batches. Loss {nats_loss:7.2f} nats.{train_metrics}',
-                    end=''
+
+                iteration_record = Formatter.format_iteration_entry(
+                    epoch, i, num_batches, nats_loss, self._train_metrics
                 )
+
+                self._output_device.write(f'\r{iteration_record}', end='')
                 iteration += 1
-                yield
 
             val_loss_nats = compute_validation_loss(self._trainer, self._val_set, val_batch_size)
             compute_validation_metrics(self._trainer, self._val_set, val_batch_size, self._val_metrics)
 
-            s = self._format_epoch_info(epoch, ma_loss.nats, val_loss_nats)
+            s = Formatter.format_epoch_info(
+                epoch, ma_loss.nats, val_loss_nats, self._train_metrics, self._val_metrics
+            )
 
             self._run_epoch_callbacks(epoch)
             self._output_device.write(f'\r{s}', end='\n')
-            yield
 
     def _reset_metrics(self):
         for metric in self._train_metrics:
@@ -121,15 +117,6 @@ class TrainingLoop:
         for metric in self._train_metrics:
             metric.update(y_hat, ground_true)
 
-    def _format_metrics(self, metrics, val_metrics=False):
-        prefix = 'Val. ' if val_metrics else ''
-
-        formatted_values = [f'{prefix}{metric.name} {metric.value:6.4f}' for metric in metrics]
-        s = '. '.join(formatted_values)
-        if formatted_values:
-            s = f' {s}.'
-        return s
-
     def _run_iteration_callbacks(self, epoch, epoch_iteration, iteration):
         with torch.no_grad():
             for cb in self._callbacks:
@@ -140,28 +127,43 @@ class TrainingLoop:
             for cb in self._callbacks:
                 cb.on_epoch(epoch)
 
-    def _format_epoch_info(self, epoch, loss, val_loss):
-        train_metrics = self._format_metrics(self._train_metrics)
-        val_metrics = self._format_metrics(self._val_metrics, val_metrics=True)
-
-        all_metrics = ''
-        if self._train_metrics:
-            all_metrics = f' {train_metrics}'
-
-        if self._val_metrics:
-            all_metrics = f'{all_metrics} {val_metrics}'
-
-        return f'Epoch {epoch:4} Loss {loss:7.2f} nats, Val. loss {val_loss:7.2f}.' \
-               f'{all_metrics}'
-
-    def set_training_task(self, task):
-        self._trainer = task
-
     def set_output_device(self, device):
         self._output_device = device
 
     def add_callback(self, cb):
         self._callbacks.append(cb)
+
+
+class Formatter:
+    @classmethod
+    def format_iteration_entry(cls, epoch, iteration, num_iterations, training_loss, training_metrics):
+        metric_string = cls._format_metrics(training_metrics)
+
+        return f'Epoch {epoch:4} {iteration + 1}/{num_iterations} batches. ' \
+               f'Loss {training_loss:7.2f} nats.' \
+               f'{metric_string}'
+
+    @classmethod
+    def format_epoch_info(cls, epoch, loss, val_loss, train_metrics, val_metrics):
+        all_metrics = ''
+        if train_metrics:
+            all_metrics = f' {cls._format_metrics(train_metrics)}'
+
+        if val_metrics:
+            all_metrics = f'{all_metrics} {cls._format_metrics(val_metrics, val_metrics=True)}'
+
+        return f'Epoch {epoch:4} Loss {loss:7.2f} nats, Val. loss {val_loss:7.2f} nats.' \
+               f'{all_metrics}'
+
+    @classmethod
+    def _format_metrics(cls, metrics, val_metrics=False):
+        prefix = 'Val. ' if val_metrics else ''
+
+        formatted_values = [f'{prefix}{metric.name} {metric.value:6.4f}' for metric in metrics]
+        s = '. '.join(formatted_values)
+        if formatted_values:
+            s = f' {s}.'
+        return s
 
 
 class OutputDevice:
