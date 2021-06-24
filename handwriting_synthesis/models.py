@@ -371,7 +371,16 @@ class HandwritingPredictionNetwork(nn.Module):
         return torch.tensor([mu1, mu2, eos_flag], device=self.device)
 
     def clip_gradients(self, output_clip_value=100, lstm_clip_value=10):
-        pass
+        def output_params():
+            for param in self.output_layer.parameters():
+                yield param
+
+        def lstm_params():
+            for param in self.lstm.parameters():
+                yield param
+
+        torch.nn.utils.clip_grad_value_(output_params(), output_clip_value)
+        torch.nn.utils.clip_grad_value_(lstm_params(), lstm_clip_value)
 
 
 def expand_dims(shape):
