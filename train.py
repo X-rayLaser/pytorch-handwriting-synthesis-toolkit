@@ -57,7 +57,11 @@ def train_unconditional_handwriting_generator(train_set, val_set, device, config
     model, epochs = utils.load_saved_weights(model, config.model_path)
     model = model.to(device)
 
-    clip_values = (config.output_clip_value, config.lstm_clip_value)
+    if config.output_clip_value == 0 or config.lstm_clip_value == 0:
+        clip_values = None
+    else:
+        clip_values = (config.output_clip_value, config.lstm_clip_value)
+
     train_task = handwriting_synthesis.tasks.HandwritingPredictionTrainingTask(device, model, clip_values)
 
     cb = handwriting_synthesis.callbacks.HandwritingGenerationCallback(
@@ -76,7 +80,11 @@ def train_handwriting_synthesis_model(train_set, val_set, device, config):
     model = models.SynthesisNetwork.get_default_model(alphabet_size, device)
     model, epochs = utils.load_saved_weights(model, config.model_path)
 
-    clip_values = (config.output_clip_value, config.lstm_clip_value)
+    if config.output_clip_value == 0 or config.lstm_clip_value == 0:
+        clip_values = None
+    else:
+        clip_values = (config.output_clip_value, config.lstm_clip_value)
+
     train_task = handwriting_synthesis.tasks.HandwritingSynthesisTask(
         tokenizer, device, model, clip_values
     )
@@ -120,8 +128,16 @@ if __name__ == '__main__':
     parser.add_argument("-e", "--epochs", type=int, default=100, help="# of epochs to train")
     parser.add_argument("-i", "--interval", type=int, default=100, help="Iterations between sampling")
 
-    parser.add_argument("--clip1", type=int, default=100, help="Gradient clipping value for output layer")
-    parser.add_argument("--clip2", type=int, default=10, help="Gradient clipping value for lstm layers")
+    parser.add_argument(
+        "--clip1", type=int, default=0,
+        help="Gradient clipping value for output layer. "
+             "When omitted or set to zero, no clipping is done."
+    )
+    parser.add_argument(
+        "--clip2", type=int, default=0,
+        help="Gradient clipping value for lstm layers. "
+             "When omitted or set to zero, no clipping is done."
+    )
 
     args = parser.parse_args()
 
