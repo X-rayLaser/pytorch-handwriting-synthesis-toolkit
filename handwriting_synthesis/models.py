@@ -262,6 +262,25 @@ class SynthesisNetwork(jit.ScriptModule):
 
         return torch.tensor([mu1, mu2, eos_flag], device=self.device)
 
+    def clip_gradients(self, output_clip_value=100, lstm_clip_value=10):
+
+        def output_params():
+            for param in self.mixture.parameters():
+                yield param
+
+        def lstm_params():
+            for param in self.lstm1.parameters():
+                yield param
+
+            for param in self.lstm2.parameters():
+                yield param
+
+            for param in self.lstm3.parameters():
+                yield param
+
+        torch.nn.utils.clip_grad_value_(output_params(), output_clip_value)
+        torch.nn.utils.clip_grad_value_(lstm_params(), lstm_clip_value)
+
 
 class MixtureDensityLayer(nn.Module):
     def __init__(self, input_size, num_components):
@@ -350,6 +369,9 @@ class HandwritingPredictionNetwork(nn.Module):
             eos_flag = 0
 
         return torch.tensor([mu1, mu2, eos_flag], device=self.device)
+
+    def clip_gradients(self, output_clip_value=100, lstm_clip_value=10):
+        pass
 
 
 def expand_dims(shape):

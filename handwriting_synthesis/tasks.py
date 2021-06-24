@@ -21,7 +21,7 @@ class DummyTask(TrainingTask):
 
 
 class BaseHandwritingTask(TrainingTask):
-    def __init__(self, device, model):
+    def __init__(self, device, model, clip_values=None):
         self._device = device
         self._model = model
         self._model = self._model.to(self._device)
@@ -30,11 +30,18 @@ class BaseHandwritingTask(TrainingTask):
             momentum=9000, centered=True
         )
 
+        self._clip_values = clip_values
+
     def train(self, batch):
         self._optimizer.zero_grad()
         y_hat, loss = self.compute_loss(batch)
         loss.backward()
-        #model.clip_gradient()
+        if self._clip_values:
+            output_clip_value, lstm_clip_value = self._clip_values
+            self._model.clip_gradients(
+                output_clip_value=output_clip_value,
+                lstm_clip_value=lstm_clip_value
+            )
         self._optimizer.step()
 
         return y_hat, loss

@@ -12,7 +12,7 @@ from handwriting_synthesis import data, utils, models, metrics
 class ConfigOptions:
     def __init__(self, batch_size, epochs, sampling_interval,
                  num_train_examples, num_val_examples, max_length,
-                 model_path, charset_path):
+                 model_path, charset_path, output_clip_value, lstm_clip_value):
         self.batch_size = batch_size
         self.epochs = epochs
         self.sampling_interval = sampling_interval
@@ -21,6 +21,8 @@ class ConfigOptions:
         self.max_length = max_length
         self.model_path = model_path
         self.charset_path = charset_path
+        self.output_clip_value = output_clip_value
+        self.lstm_clip_value = lstm_clip_value
 
 
 def print_info_message(training_task_verbose, config):
@@ -55,7 +57,8 @@ def train_unconditional_handwriting_generator(train_set, val_set, device, config
     model, epochs = utils.load_saved_weights(model, config.model_path)
     model = model.to(device)
 
-    train_task = handwriting_synthesis.tasks.HandwritingPredictionTrainingTask(device, model)
+    clip_values = (config.output_clip_value, config.lstm_clip_value)
+    train_task = handwriting_synthesis.tasks.HandwritingPredictionTrainingTask(device, model, clip_values)
 
     cb = handwriting_synthesis.callbacks.HandwritingGenerationCallback(
         model, 'samples', max_length,
@@ -73,7 +76,10 @@ def train_handwriting_synthesis_model(train_set, val_set, device, config):
     model = models.SynthesisNetwork.get_default_model(alphabet_size, device)
     model, epochs = utils.load_saved_weights(model, config.model_path)
 
-    train_task = handwriting_synthesis.tasks.HandwritingSynthesisTask(tokenizer, device, model)
+    clip_values = (config.output_clip_value, config.lstm_clip_value)
+    train_task = handwriting_synthesis.tasks.HandwritingSynthesisTask(
+        tokenizer, device, model, clip_values
+    )
 
     cb = handwriting_synthesis.callbacks.HandwritingSynthesisCallback(
         tokenizer,
@@ -114,6 +120,9 @@ if __name__ == '__main__':
     parser.add_argument("-e", "--epochs", type=int, default=100, help="# of epochs to train")
     parser.add_argument("-i", "--interval", type=int, default=100, help="Iterations between sampling")
 
+    parser.add_argument("--clip1", type=int, default=100, help="Gradient clipping value for output layer")
+    parser.add_argument("--clip2", type=int, default=10, help="Gradient clipping value for lstm layers")
+
     args = parser.parse_args()
 
     device = get_device()
@@ -139,7 +148,8 @@ if __name__ == '__main__':
                                sampling_interval=args.interval, num_train_examples=num_train_examples,
                                num_val_examples=num_val_examples, max_length=max_length,
                                model_path=model_path,
-                               charset_path=charset_path)
+                               charset_path=charset_path,
+                               output_clip_value=args.clip1, lstm_clip_value=args.clip2)
 
         if args.unconditional:
             train_unconditional_handwriting_generator(train_set, val_set, device, config)
