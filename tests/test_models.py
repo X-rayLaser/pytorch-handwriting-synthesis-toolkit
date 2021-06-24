@@ -474,8 +474,3 @@ class SynthesisNetworkTests(unittest.TestCase):
 
         self.assertLessEqual(outputs.shape[0], steps)
         self.assertEqual(outputs.shape[1], 3)
-
-
-# todo: test synthesis network
-# todo: training task for training synthesis network
-# todo: callback to synthesize new example

@@ -88,9 +88,3 @@ class SlowPeepholeLstm:
         y_yat = torch.cat(outputs, dim=0)
         y_hat = y_yat.transpose(0, 1)
         return y_hat, state
-
-
-# todo: unit test formulas and gates
-# todo: unit test lstm cell implemented in terms of gates
-# todo: unit test slow LSTM implemented in terms of lstmcell
-# todo:

@@ -192,6 +192,3 @@ class InMemoryDevice(OutputDevice):
     @property
     def lines(self):
         return [line for line in self._lines if line]
-
-
-# todo: MSE metrics run on training and validation datasets
