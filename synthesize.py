@@ -40,7 +40,8 @@ if __name__ == '__main__':
     model.load_state_dict(torch.load(args.path, map_location=device))
 
     sentinel = '\n'
-    c = handwriting_synthesis.data.transcriptions_to_tensor(tokenizer, [args.text + sentinel])
+    full_text = args.text + sentinel
+    c = handwriting_synthesis.data.transcriptions_to_tensor(tokenizer, [full_text])
 
     with data.H5Dataset(f'{args.data_dir}/train.h5') as dataset:
         mu = torch.tensor(dataset.mu)
@@ -55,5 +56,5 @@ if __name__ == '__main__':
 
     for i in range(args.trials):
         output_path = os.path.join(output_dir, f'{base_file_name}_{i}.png')
-        synthesizer.synthesize(c, output_path, show_attention=args.show_weights)
+        synthesizer.synthesize(c, output_path, show_attention=args.show_weights, text=full_text)
         print(f'Done {i} / {args.trials}')

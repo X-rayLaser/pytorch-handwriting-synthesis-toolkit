@@ -189,17 +189,28 @@ def draw_points(x, y, canvas):
         canvas.ellipse([(xi, yi), (xi + 5, yi + 5)], width=10, fill=255)
 
 
-def plot_attention_weights(phi, seq, save_path='img.png'):
+def plot_attention_weights(phi, seq, save_path='img.png', text=''):
     x, y, eos = split_into_components(seq)
 
     strokes = list(get_strokes(x, y, eos))
 
-    best_phi = phi.cpu().detach().numpy().argmax(axis=1)
+    phi = phi.cpu().detach().numpy()
 
     fig, axes = plt.subplots(2)
     fig.set_size_inches(18.5, 10.5)
 
-    axes[0].scatter(x, best_phi)
+    axes[0].set_facecolor((0, 0, 0))
+    y_ticks = list(range(phi.shape[1]))
+    if text:
+        y_labels = [ch for ch in text]
+        axes[0].set_yticks(y_ticks)
+        axes[0].set_yticklabels(y_labels, rotation=90)
+
+    for i, single_x in enumerate(x):
+        temperatures = phi[i]
+        colors = [str(t / temperatures.sum()) for t in temperatures]
+
+        axes[0].scatter([single_x] * len(temperatures), y_ticks, c=colors, s=20, cmap='gray')
 
     c = (1, 0, 0, 1)
     lc = mc.LineCollection(strokes, colors=c, linewidths=2)
@@ -261,14 +272,14 @@ class HandwritingSynthesizer:
         self.sd = sd
         self.stochastic = stochastic
 
-    def synthesize(self, c, output_path, show_attention=False):
+    def synthesize(self, c, output_path, show_attention=False, text=''):
         try:
             if show_attention:
                 sampled_handwriting, phi = self.model.sample_means_with_attention(context=c, steps=self.num_steps,
                                                                                   stochastic=self.stochastic)
                 sampled_handwriting = sampled_handwriting.cpu()
                 sampled_handwriting = sampled_handwriting * self.sd + self.mu
-                plot_attention_weights(phi, sampled_handwriting, output_path)
+                plot_attention_weights(phi, sampled_handwriting, output_path, text=text)
             else:
                 sampled_handwriting = self.model.sample_means(context=c, steps=self.num_steps,
                                                               stochastic=self.stochastic)

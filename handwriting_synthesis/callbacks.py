@@ -67,20 +67,21 @@ class HandwritingGenerationCallback(Callback):
                 os.makedirs(greedy_dir, exist_ok=True)
                 os.makedirs(random_dir, exist_ok=True)
 
-            for file_name, context in names_with_contexts:
+            for file_name, context, text in names_with_contexts:
                 greedy_path = os.path.join(greedy_dir, file_name)
                 random_path = os.path.join(random_dir, file_name)
 
                 with torch.no_grad():
-                    self.generate_handwriting(greedy_path, steps=steps, stochastic=False, context=context)
-                    self.generate_handwriting(random_path, steps=steps, stochastic=True, context=context)
+                    self.generate_handwriting(greedy_path, steps=steps, stochastic=False, context=context, text=text)
+                    self.generate_handwriting(random_path, steps=steps, stochastic=True, context=context, text=text)
 
     def get_names_with_contexts(self, iteration):
         file_name = f'iteration_{iteration}.png'
         context = None
-        return [(file_name, context)]
+        text = ''
+        return [(file_name, context, text)]
 
-    def generate_handwriting(self, save_path, steps, stochastic=True, context=None):
+    def generate_handwriting(self, save_path, steps, stochastic=True, context=None, text=''):
         mu, std = self.train_set.mu, self.train_set.std
         mu = torch.tensor(mu)
         std = torch.tensor(std)
@@ -103,16 +104,19 @@ class HandwritingSynthesisCallback(HandwritingGenerationCallback):
         sentinel = '\n'
         for i in range(images_per_iteration):
             _, transcription = self.train_set[i]
-            transcription_batch = [transcription + sentinel]
+
+            text = transcription + sentinel
+
+            transcription_batch = [text]
 
             name = re.sub('[^0-9a-zA-Z]+', '_', transcription)
             file_name = f'{name}.png'
             context = transcriptions_to_tensor(self.tokenizer, transcription_batch)
-            res.append((file_name, context))
+            res.append((file_name, context, text))
 
         return res
 
-    def generate_handwriting(self, save_path, steps, stochastic=True, context=None):
+    def generate_handwriting(self, save_path, steps, stochastic=True, context=None, text=''):
         super().generate_handwriting(save_path, steps, stochastic=stochastic, context=context)
 
         path, ext = os.path.splitext(save_path)
@@ -121,4 +125,4 @@ class HandwritingSynthesisCallback(HandwritingGenerationCallback):
         synthesizer = utils.HandwritingSynthesizer(
             self.model, self.mu, self.std, num_steps=steps, stochastic=stochastic
         )
-        synthesizer.synthesize(c=context, output_path=save_path, show_attention=True)
+        synthesizer.synthesize(c=context, output_path=save_path, show_attention=True, text=text)
