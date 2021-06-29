@@ -36,8 +36,8 @@ def print_info_message(training_task_verbose, config):
 def train_model(train_set, val_set, train_task, callbacks, config, training_task_verbose):
     print_info_message(training_task_verbose, config)
 
-    train_metrics = [metrics.MSE()]
-    val_metrics = [metrics.MSE()]
+    train_metrics = [metrics.MSE(), metrics.SSE()]
+    val_metrics = [metrics.MSE(), metrics.SSE()]
 
     loop = training.TrainingLoop(train_set, val_set, batch_size=config.batch_size, training_task=train_task,
                                  train_metrics=train_metrics, val_metrics=val_metrics)

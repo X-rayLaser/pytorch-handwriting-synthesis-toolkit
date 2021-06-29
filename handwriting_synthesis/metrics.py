@@ -52,13 +52,7 @@ class Metric:
     def reset(self):
         self._ma.reset()
 
-
-class MSE(Metric):
-    @property
-    def name(self):
-        return 'MSE'
-
-    def compute_metric(self, y_hat, ground_true):
+    def prepare_arrays(self, y_hat, ground_true):
         mixture, eos = ground_true.concatenate_predictions(y_hat)
         pi, mu, sd, ro = mixture
         num_components = pi.shape[-1]
@@ -73,5 +67,25 @@ class MSE(Metric):
 
         predictions = torch.cat([mu1, mu2, eos], dim=1)
         actual = ground_true.concatenated()
+        return predictions, actual
 
+
+class MSE(Metric):
+    @property
+    def name(self):
+        return 'MSE'
+
+    def compute_metric(self, y_hat, ground_true):
+        predictions, actual = self.prepare_arrays(y_hat, ground_true)
         return torch.nn.functional.mse_loss(predictions, actual)
+
+
+class SSE(Metric):
+    @property
+    def name(self):
+        return 'SSE'
+
+    def compute_metric(self, y_hat, ground_true):
+        predictions, actual = self.prepare_arrays(y_hat, ground_true)
+        squared_errors = (predictions - actual) ** 2
+        return squared_errors.sum(dim=1).mean()
