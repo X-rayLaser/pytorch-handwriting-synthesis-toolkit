@@ -172,13 +172,13 @@ def create_strokes_image(seq, lines=False):
     if width * height > 8000 * 2000:
         return
 
-    im = Image.new(mode='L', size=(width, height))
+    im = Image.new(mode='L', size=(width, height), color=255)
 
     canvas = ImageDraw.Draw(im)
 
     if lines:
         for stroke in get_strokes(x_with_offset, y_with_offset, eos):
-            canvas.line(stroke, width=10, fill=255)
+            canvas.line(stroke, width=10, fill=0)
     else:
         draw_points(x_with_offset, y_with_offset, canvas)
     return im
@@ -188,7 +188,7 @@ def draw_points(x, y, canvas):
     for i in range(len(x)):
         xi = x[i]
         yi = y[i]
-        canvas.ellipse([(xi, yi), (xi + 5, yi + 5)], width=10, fill=255)
+        canvas.ellipse([(xi, yi), (xi + 5, yi + 5)], width=10, fill=0)
 
 
 def plot_attention_weights(phi, seq, save_path='img.png', text=''):

@@ -1,3 +1,5 @@
+import traceback
+
 import torch
 import torch.nn as nn
 import torch.jit as jit
@@ -246,21 +248,7 @@ class SynthesisNetwork(jit.ScriptModule):
         return pi.unsqueeze(0), mu.unsqueeze(0), sd.unsqueeze(0), ro.unsqueeze(0), eos.unsqueeze(0)
 
     def get_mean_prediction(self, mixture, stochastic=False):
-        pi, mu, sd, ro, eos = mixture
-        num_components = len(pi)
-        if stochastic:
-            component = torch.multinomial(pi, 1).item()
-        else:
-            component = pi.cpu().argmax()
-        mu1 = mu[component]
-        mu2 = mu[component + num_components]
-
-        if eos > 0.5:
-            eos_flag = 1
-        else:
-            eos_flag = 0
-
-        return torch.tensor([mu1, mu2, eos_flag], device=self.device)
+        return get_mean_prediction(mixture, self.device, stochastic)
 
     def clip_gradients(self, output_clip_value=100, lstm_clip_value=10):
 
@@ -354,21 +342,7 @@ class HandwritingPredictionNetwork(nn.Module):
         return pi[0, 0], mu[0, 0], sd[0, 0], ro[0, 0], eos[0, 0]
 
     def get_mean_prediction(self, output, stochastic=False):
-        pi, mu, sd, ro, eos = output
-        num_components = len(pi)
-        if stochastic:
-            component = torch.multinomial(pi, 1).item()
-        else:
-            component = pi.cpu().argmax()
-        mu1 = mu[component]
-        mu2 = mu[component + num_components]
-
-        if eos > 0.5:
-            eos_flag = 1
-        else:
-            eos_flag = 0
-
-        return torch.tensor([mu1, mu2, eos_flag], device=self.device)
+        return get_mean_prediction(output, self.device, stochastic)
 
     def clip_gradients(self, output_clip_value=100, lstm_clip_value=10):
         def output_params():
@@ -381,6 +355,48 @@ class HandwritingPredictionNetwork(nn.Module):
 
         torch.nn.utils.clip_grad_value_(output_params(), output_clip_value)
         torch.nn.utils.clip_grad_value_(lstm_params(), lstm_clip_value)
+
+
+def get_mean_prediction(output, device, stochastic, sample_xy=False):
+    pi, mu, sd, ro, eos = output
+    num_components = len(pi)
+    if stochastic:
+        component = torch.multinomial(pi, 1).item()
+    else:
+        component = pi.cpu().argmax()
+    mu1 = mu[component]
+    mu2 = mu[component + num_components]
+
+    sd1 = sd[component]
+    sd2 = sd[component + num_components]
+
+    component_ro = ro[component]
+
+    x, y = mu1, mu2
+    if sample_xy:
+        try:
+            x, y = sample_from_bivariate_mixture(mu1, mu2, sd1, sd2, component_ro)
+        except Exception:
+            traceback.print_exc()
+
+    if eos > 0.5:
+        eos_flag = 1
+    else:
+        eos_flag = 0
+
+    return torch.tensor([x, y, eos_flag], device=device)
+
+
+def sample_from_bivariate_mixture(mu1, mu2, sd1, sd2, ro):
+    cov_x_y = ro * sd1 * sd2
+    sigma = torch.tensor([[sd1 ** 2, cov_x_y], [cov_x_y, sd2 ** 2]])
+
+    loc = torch.tensor([mu1.item(), mu2.item()])
+    gmm = torch.distributions.MultivariateNormal(loc, sigma)
+
+    v = gmm.sample()
+
+    return v[0].item(), v[1].item()
 
 
 def expand_dims(shape):
