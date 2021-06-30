@@ -288,3 +288,14 @@ class HandwritingSynthesizer:
                 visualize_strokes(sampled_handwriting, output_path, lines=True)
         except Exception:
             traceback.print_exc()
+
+
+def get_charset_path_or_raise(charset_path, default_path):
+    if charset_path:
+        if not os.path.isfile(charset_path):
+            raise Exception(
+                f'File {charset_path} not found. Charset must be a path to existing text file.'
+            )
+    else:
+        charset_path = default_path
+    return charset_path

@@ -22,11 +22,14 @@ if __name__ == '__main__':
         help="When set, at every step will output a point with highest probability density. "
              "Otherwise, every point is randomly sampled"
     )
+    parser.add_argument("-c", "--charset", type=str, default='', help="Path to the charset file")
 
     args = parser.parse_args()
     stochastic = not args.deterministic
 
-    charset_path = os.path.join(args.data_dir, 'charset.txt')
+    default_charset_path = os.path.join(args.data_dir, 'charset.txt')
+    charset_path = utils.get_charset_path_or_raise(args.charset, default_charset_path)
+
     tokenizer = data.Tokenizer.from_file(charset_path)
     alphabet_size = tokenizer.size
 

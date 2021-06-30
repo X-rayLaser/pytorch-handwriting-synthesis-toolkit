@@ -127,6 +127,7 @@ if __name__ == '__main__':
     parser.add_argument("-b", "--batch_size", type=int, default=32, help="Batch size")
     parser.add_argument("-e", "--epochs", type=int, default=100, help="# of epochs to train")
     parser.add_argument("-i", "--interval", type=int, default=100, help="Iterations between sampling")
+    parser.add_argument("-c", "--charset", type=str, default='', help="Path to the charset file")
 
     parser.add_argument(
         "--clip1", type=int, default=0,
@@ -151,7 +152,9 @@ if __name__ == '__main__':
 
     train_dataset_path = os.path.join(args.data_dir, 'train.h5')
     val_dataset_path = os.path.join(args.data_dir, 'val.h5')
-    charset_path = os.path.join(args.data_dir, 'charset.txt')
+
+    default_charset_path = os.path.join(args.data_dir, 'charset.txt')
+    charset_path = utils.get_charset_path_or_raise(args.charset, default_charset_path)
 
     with data.NormalizedDataset(train_dataset_path, mu, sd) as train_set, \
             data.NormalizedDataset(val_dataset_path, mu, sd) as val_set:
