@@ -1,13 +1,15 @@
 import re
 import os
 import traceback
-
+import math
 import torch
 import numpy as np
 from PIL import Image, ImageDraw
 import matplotlib.pyplot as plt
 from matplotlib import collections as mc
+from torch.utils.data import DataLoader
 from . import data
+from .metrics import MovingAverage
 
 
 class PaddedSequencesBatch:
@@ -299,3 +301,57 @@ def get_charset_path_or_raise(charset_path, default_path):
     else:
         charset_path = default_path
     return charset_path
+
+
+def collate(batch):
+    x = []
+    y = []
+    for points, text in batch:
+        x.append(points)
+        y.append(text)
+    return x, y
+
+
+def compute_validation_loss(trainer, dataset, batch_size, verbose=False):
+    loader = DataLoader(dataset, batch_size, collate_fn=collate)
+
+    with torch.no_grad():
+        ma_loss = MovingAverage()
+        ma_loss.reset()
+
+        batches = math.ceil(len(dataset) / batch_size)
+
+        for i, data in enumerate(loader):
+            y_hat, loss = trainer.compute_loss(data)
+            ma_loss.update(loss)
+            if verbose:
+                if (i + 1) % 1 == 0:
+                    print(f'\rProcessed {i + 1} / {batches} batches', end='')
+                if (i + 1) == batches:
+                    print()
+
+        return ma_loss.nats
+
+
+def compute_validation_metrics(trainer, dataset, batch_size, metrics, verbose=False):
+    loader = DataLoader(dataset, batch_size, collate_fn=collate)
+
+    with torch.no_grad():
+        for metric in metrics:
+            metric.reset()
+
+        batches = math.ceil(len(dataset) / batch_size)
+
+        for i, data in enumerate(loader):
+            y_hat, loss = trainer.compute_loss(data)
+            _, eos = y_hat
+            points, _ = data
+            for metric in metrics:
+                ground_true = PaddedSequencesBatch(points, device=eos.device)
+                metric.update(y_hat, ground_true)
+
+            if verbose:
+                if (i + 1) % 1 == 0:
+                    print(f'\rProcessed {i + 1} / {batches} batches', end='')
+                if (i + 1) == batches:
+                    print()

@@ -4,45 +4,7 @@ from torch.utils.data.dataloader import DataLoader
 from .metrics import MovingAverage
 from .tasks import TrainingTask
 from . import utils
-
-
-def collate(batch):
-    x = []
-    y = []
-    for points, text in batch:
-        x.append(points)
-        y.append(text)
-    return x, y
-
-
-def compute_validation_loss(trainer, dataset, batch_size):
-    loader = DataLoader(dataset, batch_size, collate_fn=collate)
-
-    with torch.no_grad():
-        ma_loss = MovingAverage()
-        ma_loss.reset()
-
-        for i, data in enumerate(loader):
-            y_hat, loss = trainer.compute_loss(data)
-            ma_loss.update(loss)
-
-        return ma_loss.nats
-
-
-def compute_validation_metrics(trainer, dataset, batch_size, metrics):
-    loader = DataLoader(dataset, batch_size, collate_fn=collate)
-
-    with torch.no_grad():
-        for metric in metrics:
-            metric.reset()
-
-        for i, data in enumerate(loader):
-            y_hat, loss = trainer.compute_loss(data)
-            _, eos = y_hat
-            points, _ = data
-            for metric in metrics:
-                ground_true = utils.PaddedSequencesBatch(points, device=eos.device)
-                metric.update(y_hat, ground_true)
+from .utils import collate, compute_validation_loss, compute_validation_metrics
 
 
 class TrainingLoop:
