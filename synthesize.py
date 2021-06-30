@@ -12,6 +12,7 @@ if __name__ == '__main__':
     parser.add_argument("data_dir", type=str, help="Path to prepared dataset directory")
     parser.add_argument("path", type=str, help="Path to saved model")
     parser.add_argument("text", type=str, help="Text to be converted to handwriting")
+    parser.add_argument("-b", "--bias",  type=float, default=0, help="A probability bias value (as in paper)")
     parser.add_argument("--trials",  type=int, default=1, help="Number of attempts")
     parser.add_argument(
         "--show_weights", default=False, action="store_true",
@@ -35,7 +36,8 @@ if __name__ == '__main__':
 
     device = torch.device("cpu")
 
-    model = models.SynthesisNetwork.get_default_model(alphabet_size, device)
+    bias = args.bias
+    model = models.SynthesisNetwork.get_default_model(alphabet_size, device, bias=bias)
     model = model.to(device)
 
     base_file_name = re.sub('[^0-9a-zA-Z]+', '_', args.text)

@@ -119,10 +119,11 @@ class SoftWindow(jit.ScriptModule):
 
 class SynthesisNetwork(jit.ScriptModule):
     @classmethod
-    def get_default_model(cls, alphabet_size, device):
-        return cls(3, 400, alphabet_size, device)
+    def get_default_model(cls, alphabet_size, device, bias=None):
+        return cls(3, 400, alphabet_size, device, bias=bias)
 
-    def __init__(self, input_size, hidden_size, alphabet_size, device, gaussian_components=10, output_mixtures=20):
+    def __init__(self, input_size, hidden_size, alphabet_size, device,
+                 gaussian_components=10, output_mixtures=20, bias=None):
         super().__init__()
 
         self.hidden_size = hidden_size
@@ -134,7 +135,7 @@ class SynthesisNetwork(jit.ScriptModule):
         self.window = SoftWindow(hidden_size, gaussian_components)
         self.lstm2 = PeepholeLSTM(input_size + hidden_size + alphabet_size, hidden_size)
         self.lstm3 = PeepholeLSTM(input_size + hidden_size + alphabet_size, hidden_size)
-        self.mixture = MixtureDensityLayer(hidden_size * 3, output_mixtures)
+        self.mixture = MixtureDensityLayer(hidden_size * 3, output_mixtures, bias)
 
     @jit.script_method
     def forward(self, x: Tensor, c: Tensor):
@@ -271,7 +272,7 @@ class SynthesisNetwork(jit.ScriptModule):
 
 
 class MixtureDensityLayer(nn.Module):
-    def __init__(self, input_size, num_components):
+    def __init__(self, input_size, num_components, bias=None):
         super().__init__()
 
         self.num_components = num_components
@@ -281,10 +282,20 @@ class MixtureDensityLayer(nn.Module):
         self.ro = nn.Linear(input_size, num_components)
         self.eos = nn.Linear(input_size, 1)
 
+        self.bias = bias
+
     def forward(self, x):
-        pi = F.softmax(self.pi(x), dim=-1)
+        pi_hat = self.pi(x)
+        sd_hat = self.sd(x)
+
+        if self.bias is None:
+            pi = F.softmax(pi_hat, dim=-1)
+            sd = torch.exp(sd_hat)
+        else:
+            pi = F.softmax(pi_hat * (1 + self.bias), dim=-1)
+            sd = torch.exp(sd_hat - self.bias)
+
         mu = self.mu(x)
-        sd = torch.exp(self.sd(x))
         ro = torch.tanh(self.ro(x))
         eos = torch.sigmoid(self.eos(x))
         return pi, mu, sd, ro, eos
@@ -357,8 +368,9 @@ class HandwritingPredictionNetwork(nn.Module):
         torch.nn.utils.clip_grad_value_(lstm_params(), lstm_clip_value)
 
 
-def get_mean_prediction(output, device, stochastic, sample_xy=False):
+def get_mean_prediction(output, device, stochastic, sample_xy=True):
     pi, mu, sd, ro, eos = output
+
     num_components = len(pi)
     if stochastic:
         component = torch.multinomial(pi, 1).item()
