@@ -10,3 +10,4 @@ checkpoints/
 *.h5
 charset.txt
 iam_ondb/
+*.pt
