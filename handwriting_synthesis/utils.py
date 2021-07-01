@@ -330,7 +330,7 @@ def compute_validation_loss(trainer, dataset, batch_size, verbose=False):
                 if (i + 1) == batches:
                     print()
 
-        return ma_loss.nats
+        return ma_loss.value
 
 
 def compute_validation_metrics(trainer, dataset, batch_size, metrics, verbose=False):

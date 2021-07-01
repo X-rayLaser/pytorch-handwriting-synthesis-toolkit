@@ -13,10 +13,6 @@ class MovingAverage:
             return 0
         return self._value / self._iterations
 
-    @property
-    def nats(self):
-        return self.value / math.log2(math.e)
-
     def update(self, v):
         self._value += v
         self._iterations += 1
@@ -37,10 +33,6 @@ class Metric:
     @property
     def value(self):
         return self._ma.value
-
-    @property
-    def nats(self):
-        return self._ma.nats
 
     def update(self, y_hat, ground_true):
         metric = self.compute_metric(y_hat, ground_true)

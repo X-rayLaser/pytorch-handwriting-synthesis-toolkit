@@ -30,7 +30,7 @@ def print_info_message(training_task_verbose, config):
           f'validation set size {config.num_val_examples}, '
           f'batch size {config.batch_size}, '
           f'max sequence length {config.max_length},'
-          f'sampling interval (in # epochs): {config.sampling_interval}')
+          f'sampling interval (in # iterations): {config.sampling_interval}')
 
 
 def train_model(train_set, val_set, train_task, callbacks, config, training_task_verbose):

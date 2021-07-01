@@ -46,7 +46,7 @@ class TrainingLoop:
                     ma_loss.update(loss)
                     self._compute_train_metrics(y_hat, points)
 
-                nats_loss = ma_loss.nats
+                nats_loss = ma_loss.value
 
                 iteration_record = Formatter.format_iteration_entry(
                     epoch, i, num_batches, nats_loss, self._train_metrics
@@ -59,7 +59,7 @@ class TrainingLoop:
             compute_validation_metrics(self._trainer, self._val_set, val_batch_size, self._val_metrics)
 
             s = Formatter.format_epoch_info(
-                epoch, ma_loss.nats, val_loss_nats, self._train_metrics, self._val_metrics
+                epoch, ma_loss.value, val_loss_nats, self._train_metrics, self._val_metrics
             )
 
             self._run_epoch_callbacks(epoch)
