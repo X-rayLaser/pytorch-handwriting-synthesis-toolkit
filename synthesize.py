@@ -12,7 +12,9 @@ if __name__ == '__main__':
     parser.add_argument("data_dir", type=str, help="Path to prepared dataset directory")
     parser.add_argument("path", type=str, help="Path to saved model")
     parser.add_argument("text", type=str, help="Text to be converted to handwriting")
-    parser.add_argument("-b", "--bias",  type=float, default=0, help="A probability bias value (as in paper)")
+    parser.add_argument(
+        "-b", "--bias",  type=float, default=0, help="A probability bias. Unbiased sampling is performed by default."
+    )
     parser.add_argument("--trials",  type=int, default=1, help="Number of attempts")
     parser.add_argument(
         "--show_weights", default=False, action="store_true",
@@ -59,7 +61,7 @@ if __name__ == '__main__':
     output_dir = 'samples'
     os.makedirs(output_dir, exist_ok=True)
 
-    for i in range(args.trials):
+    for i in range(1, args.trials + 1):
         output_path = os.path.join(output_dir, f'{base_file_name}_{i}.png')
         synthesizer.synthesize(c, output_path, show_attention=args.show_weights, text=full_text)
         print(f'Done {i} / {args.trials}')

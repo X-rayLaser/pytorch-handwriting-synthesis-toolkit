@@ -303,14 +303,14 @@ class MixtureDensityLayer(nn.Module):
 
 class HandwritingPredictionNetwork(nn.Module):
     @classmethod
-    def get_default_model(cls, device):
-        return cls(3, 900, 20, device)
+    def get_default_model(cls, device, bias=None):
+        return cls(3, 900, 20, device, bias=bias)
 
-    def __init__(self, input_size, hidden_size, num_components, device=None):
+    def __init__(self, input_size, hidden_size, num_components, device=None, bias=None):
         super().__init__()
         self.input_size = input_size
         self.lstm = PeepholeLSTM(input_size, hidden_size)
-        self.output_layer = MixtureDensityLayer(hidden_size, num_components)
+        self.output_layer = MixtureDensityLayer(hidden_size, num_components, bias=bias)
 
         self._lstm_state = None
         if device is None:
