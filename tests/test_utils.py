@@ -1,7 +1,7 @@
 import unittest
 import torch
 from handwriting_synthesis import utils
-from handwriting_synthesis.data_providers import IAMonDBProviderFactory
+from handwriting_synthesis.data_providers import IAMonDBProvider
 from handwriting_synthesis import data
 
 
@@ -89,13 +89,13 @@ class PaddedSequencesBatchTests(unittest.TestCase):
 
 class VisualizationTests(unittest.TestCase):
     def setUp(self):
-        factory = IAMonDBProviderFactory(training_data_size=1,
-                                         validation_data_size=1,
-                                         iam_home='../../iam_ondb_home')
-        provider = factory.train_data_provider
+        factory = IAMonDBProvider(training_data_size=1,
+                                  validation_data_size=1,
+                                  iam_home='../../iam_ondb_home')
+        data_gen = factory.get_training_data()
 
         self.steps = 700
-        preprocessed = list(data.preprocess_data(provider, self.steps))
+        preprocessed = list(data.preprocess_data(data_gen, self.steps))
         points, transcription = preprocessed[0]
         self.tensor = torch.tensor(points)
         self.transcription = transcription
