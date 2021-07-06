@@ -12,7 +12,8 @@ from handwriting_synthesis import data, utils, models, metrics
 class ConfigOptions:
     def __init__(self, batch_size, epochs, sampling_interval,
                  num_train_examples, num_val_examples, max_length,
-                 model_path, charset_path, output_clip_value, lstm_clip_value):
+                 model_path, charset_path, samples_dir,
+                 output_clip_value, lstm_clip_value):
         self.batch_size = batch_size
         self.epochs = epochs
         self.sampling_interval = sampling_interval
@@ -21,6 +22,7 @@ class ConfigOptions:
         self.max_length = max_length
         self.model_path = model_path
         self.charset_path = charset_path
+        self.samples_dir = samples_dir
         self.output_clip_value = output_clip_value
         self.lstm_clip_value = lstm_clip_value
 
@@ -65,7 +67,7 @@ def train_unconditional_handwriting_generator(train_set, val_set, device, config
     train_task = handwriting_synthesis.tasks.HandwritingPredictionTrainingTask(device, model, clip_values)
 
     cb = handwriting_synthesis.callbacks.HandwritingGenerationCallback(
-        model, 'samples', config.max_length,
+        model, config.samples_dir, config.max_length,
         train_set, iteration_interval=config.sampling_interval
     )
 
@@ -92,7 +94,7 @@ def train_handwriting_synthesis_model(train_set, val_set, device, config):
     cb = handwriting_synthesis.callbacks.HandwritingSynthesisCallback(
         tokenizer,
         10,
-        model, 'synthesized', config.max_length,
+        model, config.samples_dir, config.max_length,
         train_set, iteration_interval=config.sampling_interval
     )
 
@@ -128,6 +130,9 @@ if __name__ == '__main__':
     parser.add_argument("-e", "--epochs", type=int, default=100, help="# of epochs to train")
     parser.add_argument("-i", "--interval", type=int, default=100, help="Iterations between sampling")
     parser.add_argument("-c", "--charset", type=str, default='', help="Path to the charset file")
+
+    parser.add_argument("--samples_dir", type=str, default='samples',
+                        help="Path to the directory that will store samples")
 
     parser.add_argument(
         "--clip1", type=int, default=0,
@@ -168,6 +173,7 @@ if __name__ == '__main__':
                                num_val_examples=num_val_examples, max_length=max_length,
                                model_path=model_path,
                                charset_path=charset_path,
+                               samples_dir=args.samples_dir,
                                output_clip_value=args.clip1, lstm_clip_value=args.clip2)
 
         if args.unconditional:

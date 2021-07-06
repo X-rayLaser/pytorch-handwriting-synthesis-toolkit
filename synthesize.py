@@ -10,7 +10,7 @@ from handwriting_synthesis import data, utils, models, callbacks
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("data_dir", type=str, help="Path to prepared dataset directory")
-    parser.add_argument("path", type=str, help="Path to saved model")
+    parser.add_argument("model_path", type=str, help="Path to saved model")
     parser.add_argument("text", type=str, help="Text to be converted to handwriting")
     parser.add_argument(
         "-b", "--bias",  type=float, default=0, help="A probability bias. Unbiased sampling is performed by default."
@@ -20,15 +20,11 @@ if __name__ == '__main__':
         "--show_weights", default=False, action="store_true",
         help="When set, will produce a plot: handwriting against attention weights"
     )
-    parser.add_argument(
-        "--deterministic", default=False, action="store_true",
-        help="When set, at every step will output a point with highest probability density. "
-             "Otherwise, every point is randomly sampled"
-    )
     parser.add_argument("-c", "--charset", type=str, default='', help="Path to the charset file")
+    parser.add_argument("--samples_dir", type=str, default='samples',
+                        help="Path to the directory that will store samples")
 
     args = parser.parse_args()
-    stochastic = not args.deterministic
 
     default_charset_path = os.path.join(args.data_dir, 'charset.txt')
     charset_path = utils.get_charset_path_or_raise(args.charset, default_charset_path)
@@ -44,7 +40,7 @@ if __name__ == '__main__':
 
     base_file_name = re.sub('[^0-9a-zA-Z]+', '_', args.text)
 
-    model.load_state_dict(torch.load(args.path, map_location=device))
+    model.load_state_dict(torch.load(args.model_path, map_location=device))
 
     sentinel = '\n'
     full_text = args.text + sentinel
@@ -55,10 +51,10 @@ if __name__ == '__main__':
         sd = torch.tensor(dataset.std)
 
     synthesizer = utils.HandwritingSynthesizer(
-        model, mu, sd, num_steps=dataset.max_length, stochastic=stochastic
+        model, mu, sd, num_steps=dataset.max_length, stochastic=True
     )
 
-    output_dir = 'samples'
+    output_dir = args.samples_dir
     os.makedirs(output_dir, exist_ok=True)
 
     for i in range(1, args.trials + 1):

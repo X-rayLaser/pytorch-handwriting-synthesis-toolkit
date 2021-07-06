@@ -368,7 +368,7 @@ class HandwritingPredictionNetwork(nn.Module):
         torch.nn.utils.clip_grad_value_(lstm_params(), lstm_clip_value)
 
 
-def get_mean_prediction(output, device, stochastic, sample_xy=True):
+def get_mean_prediction(output, device, stochastic):
     pi, mu, sd, ro, eos = output
 
     num_components = len(pi)
@@ -385,7 +385,7 @@ def get_mean_prediction(output, device, stochastic, sample_xy=True):
     component_ro = ro[component]
 
     x, y = mu1, mu2
-    if sample_xy:
+    if stochastic:
         try:
             x, y = sample_from_bivariate_mixture(mu1, mu2, sd1, sd2, component_ro)
         except Exception:
