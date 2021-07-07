@@ -2,17 +2,32 @@
 
 # Introduction
 
-Implementation of Alex Graves et al. paper, sections 4 (handwriting prediction) and 5 (handwriting synthesis).
-This repository contains utilities to train neural networks and experiment with them.
+This toolkit contains utilities used to replicate some of the experiments described in Alex Graves's paper Generating Sequences With Recurrent Neural Networks. Concretely, this repository focuses on handwriting prediction and handwriting synthesis sections.
 
-# 1. Installation
+The repository includes almost everything that one might need for running the experiments. It provides a complete working pipeline to take the dataset, train the model and generate samples. One only needs to provide the dataset. Scripts will take of everything else, including data preprocessing and normalization.
+
+The implementation closely follows the paper, from model architectures to training setup. However, it also provides some customization (such as choosing the batch size, the maximum length of the sequences, etc.)
+In addition, the code can work with a custom dataset.
+
+
+Supported functionality:
+- training prediction network
+- training synthesis network
+- (unconditional) sampling from the prediction network
+- (conditional) sampling from synthesis network (text -> handwriting)
+- visualization of attention weights computed by synthesis network
+- biased sampling
+- training can be paused and resumed
+- training on custom dataset
+
+# Installation
 
 After cloning this repository, install its python dependencies:
 ```
 pip install -r requirements.txt
 ```
 
-# 2. Prerequisites
+# Prerequisites
 
 In order to carry out the experiments from the paper, you will need to download 
 the IAM On-Line Handwriting Database (or shortly, IAM-OnDB).
@@ -37,7 +52,7 @@ Download the data set and unzip it into iam_ondb_home folder. The layout of the 
     └── original
 ```
 
-# 3. Quickstart
+# Quickstart
 
 Extract data examples from IAM-onDB dataset, preprocess it and save it into "data" directory:
 ```
@@ -52,9 +67,9 @@ After running this command, you should see a new folder called "data" containing
 └── val.h5
 ```
 
-Start training synthesis network for 10 epoch with batch size 32.
+Start training synthesis network for 50 epoch with batch size 32 (this might a lot of time, even on GPU).
 ```
-python train.py -b 32 -e 10 -i 300 data checkpoints
+python train.py -b 32 -e 50 -i 300 data checkpoints
 ```
 
 Create 1 handwriting for the string 'Text to be converted to handwriting'.
@@ -65,22 +80,105 @@ python synthesize.py data checkpoints/model_at_epoch_2.pt 'Text to be converted 
 This section very briefly describes steps needed to train (conditional) synthesis network.
 For more details, see dedicated sections below.
 
-# 4. The guide
+# The guide
 
-## Raw data format
-The toolkit expects data as tuples (sequence, transcript). Here,
-sequence is a list of strokes, and a transcript is a 
-corresponding text. A stroke is (another) list of
-tuples (x, y), where x and y are point coordinates.
+## Data preparation
+The toolkit already comes with a built-in data preparation utility. 
+However, it requires a so-called data provider. If you want to use the IAM-onDB dataset, 
+no further action is necessary. Otherwise, you have to write your own to let the toolkit 
+know how to extract the data.
 
-## Preprocessing
+Once there is a provider class, the toolkit will automatically preprocess data and save it. 
+The preprocessing only involves mainly involves the following steps:
+- flattening every raw handwriting into a list of 3-element tuples  
+(containing x and y coordinates as well as End-Of-Stroke flag)
+- replacing every coordinate in a list of into its offset from the previous one
+- truncating the sequences longer than a specified threshold
 
-Once there is a class that implements a thin API to access raw data,
-the toolkit can use this class to automatically preprocess data and save it.
-This is done by running a script "prepare_data.py". Running
-the script will create 2 .h5 files for training and validation examples.
-Additionally, this will also create a text file storing all the 
-characters extracted from transcripts charset.txt.
+The steps above apply only to the handwriting portion of the data. 
+Transcripts remain unchanged.
+
+Data preparation is done by running the command prepare_data.py. 
+Executing the script will create two files in HDF5 format, 
+1 for training and 1 for validation examples. Along the way, the script also 
+computes the mean and standard deviation and extracts all unique characters 
+from transcripts.
+
+The command expects at least two arguments: a path to a directory that will 
+store prepared data and a name of a data provider. The name must match the 
+data provider's name attributes (for example, iam for IAMonDBProvider class).
+The data provider class might have __init__ method that takes arguments 
+(as is the case for iam provider). If that's the case, you need to pass them 
+in when calling the script.
+
+An optional parameter --max_len sets the maximum length of handwriting. 
+Any handwriting longer than max_len is going to be truncated to max_len points.
+
+For more details on the command usage, see the Commands section.
+
+## Implementing custom data provider
+
+The data provider is a class with a class attribute "name" and two methods: 
+get_training_data and get_validation_data.
+
+Methods have to return an iterable or generator of pairs of examples in a 
+certain format. Other than that, these methods can contain any logic whatsoever.
+
+Every example needs to be a tuple of size 2. The second element is a 
+corresponding transcript as a Python string. The first element of the 
+tuple stores handwriting represented as a list of strokes. A stroke is yet 
+another list of tuples (x, y), where x and y are coordinates recorded by a 
+pen moving on the screen surface. Here is an example of handwriting consisting 
+of 3 strokes:
+```
+[
+    [(1, 2), (1, 3), (2, 5)],
+    [(10, 3), (15, 4), (18, 8)],
+    [(22, 10), (20, 5)]
+]
+```
+
+Let's create a dummy data provider that returns only one training and 
+validation example. First, open a python module 
+handwriting_synthesis.data_providers.custom.py. 
+Implement a new class named DummyProvider in that module. 
+```
+class DummyProvider(Provider):
+    name = 'dummy'
+
+    def get_training_data(self):
+        handwriting = [
+            [(1, 2), (1, 3), (2, 5)],
+            [(10, 3), (15, 4), (18, 8)],
+            [(22, 10), (20, 5)]
+        ]
+
+        transcript = 'Hi'
+        yield handwriting, transcript
+
+    def get_validation_data(self):
+        handwriting = [
+            [(1, 2), (1, 3), (2, 5)],
+            [(10, 3), (15, 4), (18, 8)],
+            [(22, 10), (20, 5)]
+        ]
+
+        transcript = 'Hi'
+        yield handwriting, transcript
+
+```
+
+Here we yield the same data from both methods. If we wanted, we could 
+fetch some data from a file or even download them via a network. It does 
+not matter how the data gets retrieved. The only thing that matters is what 
+the data provider returns or yields.
+
+Note that name attribute we added to the class. We can now use it to tell 
+the preparation script to use the data provider class with that name.
+It's time to test the provider:
+python prepare_data.py temp_data dummy
+You should see a directory temp_data containing HDF5 files and one text file 
+with the text "Hi".
 
 ## Training
 
@@ -99,6 +197,13 @@ load the model weights and continue training.
 
 Finally, after specified number iterations, the script will sample 
 a few hand writings from a network and save them in a folder.
+
+### Using custom character set
+By default, the script will use character set stored under <prepared_data_folder>/charset.txt.
+This file contains all characters that were found by scanning the text part of the dataset.
+This might include digits, punctuation as well as other non-letter characters.
+You might want to restrict the set to contain only white-space and letters. Just create a new text file and
+populate it with characters that you want your synthesis network to be able to produce.
 
 ## Sampling from Handwriting synthesis network
 
@@ -146,7 +251,7 @@ while lower values result in less readable but more diverse samples.
 
 By default, bias equals to 0 which corresponds to unbiased sampling.
 
-## 1.5 Sampling from a prediction network (unconditional)
+## Sampling from a prediction network (unconditional)
 To sample from a prediction network, you can use sample.py script.
 It expects 3 required arguments: path to prepared dataset, path to pretrained
 prediction network and path to directory that will store generated samples.
@@ -156,7 +261,7 @@ Run the command below to generate 1 handwriting and save it to samples_dir folde
 python sample.py data checkpoints/model_at_epoch_2.pt samples_dir
 ```
 
-# 5. Commands manual
+# Commands manual
 
 ## prepare_data.py
 Extract (optionally split), preprocess and save data in specified destination folder.
@@ -278,7 +383,7 @@ optional arguments:
 ```
 
 
-# 6. Samples
+# Samples
 
 ## Unbiased samples
 
@@ -296,3 +401,11 @@ optional arguments:
 ## Slightly biased samples (bias = 0.1)
 
 # References
+
+[1] [Alex Graves. Generating Sequences With Recurrent Neural Networks](https://arxiv.org/abs/1308.0850)
+
+[2] [Liwicki, M. and Bunke, H.: IAM-OnDB - an On-Line English Sentence Database Acquired from Handwritten Text on a Whiteboard](https://fki.tic.heia-fr.ch/databases/iam-on-line-handwriting-database#LiBu05-03)
+
+# Support
+If you find this repository useful, consider starring it by clicking at the ★ button.
+It would be much appreciated.
