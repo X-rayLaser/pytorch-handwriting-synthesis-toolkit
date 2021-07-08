@@ -1,4 +1,4 @@
-![Handwriting image](generated_samples/Handwriting_synthesis_in_Python.png)
+![Handwriting image](results/Handwriting_synthesis_in_Python.png)
 
 # Introduction
 
@@ -388,45 +388,45 @@ optional arguments:
 ## Biased samples
 
 ### Probability bias 2:
-![image](generated_samples/conditional/biased/2/Biased_handwriting_sample__1.png)
-![image](generated_samples/conditional/biased/2/Biased_handwriting_sample__2.png)
-![image](generated_samples/conditional/biased/2/Biased_handwriting_sample__3.png)
-![image](generated_samples/conditional/biased/2/Biased_handwriting_sample__4.png)
-![image](generated_samples/conditional/biased/2/Biased_handwriting_sample__5.png)
+![image](results/conditional/biased/2/Biased_handwriting_sample__1.png)
+![image](results/conditional/biased/2/Biased_handwriting_sample__2.png)
+![image](results/conditional/biased/2/Biased_handwriting_sample__3.png)
+![image](results/conditional/biased/2/Biased_handwriting_sample__4.png)
+![image](results/conditional/biased/2/Biased_handwriting_sample__5.png)
 
 ### Probability bias 1:
-![image](generated_samples/conditional/biased/1/Biased_handwriting_sample__1.png)
-![image](generated_samples/conditional/biased/1/Biased_handwriting_sample__2.png)
-![image](generated_samples/conditional/biased/1/Biased_handwriting_sample__3.png)
-![image](generated_samples/conditional/biased/1/Biased_handwriting_sample__4.png)
-![image](generated_samples/conditional/biased/1/Biased_handwriting_sample__5.png)
+![image](results/conditional/biased/1/Biased_handwriting_sample__1.png)
+![image](results/conditional/biased/1/Biased_handwriting_sample__2.png)
+![image](results/conditional/biased/1/Biased_handwriting_sample__3.png)
+![image](results/conditional/biased/1/Biased_handwriting_sample__4.png)
+![image](results/conditional/biased/1/Biased_handwriting_sample__5.png)
 
 ### Probability bias 0.5:
-![image](generated_samples/conditional/biased/0.5/Biased_handwriting_sample__1.png)
-![image](generated_samples/conditional/biased/0.5/Biased_handwriting_sample__2.png)
-![image](generated_samples/conditional/biased/0.5/Biased_handwriting_sample__3.png)
-![image](generated_samples/conditional/biased/0.5/Biased_handwriting_sample__4.png)
-![image](generated_samples/conditional/biased/0.5/Biased_handwriting_sample__5.png)
+![image](results/conditional/biased/0.5/Biased_handwriting_sample__1.png)
+![image](results/conditional/biased/0.5/Biased_handwriting_sample__2.png)
+![image](results/conditional/biased/0.5/Biased_handwriting_sample__3.png)
+![image](results/conditional/biased/0.5/Biased_handwriting_sample__4.png)
+![image](results/conditional/biased/0.5/Biased_handwriting_sample__5.png)
 
 ### Probability bias 0.1:
-![image](generated_samples/conditional/biased/0.1/Biased_handwriting_sample__1.png)
-![image](generated_samples/conditional/biased/0.1/Biased_handwriting_sample__2.png)
-![image](generated_samples/conditional/biased/0.1/Biased_handwriting_sample__3.png)
-![image](generated_samples/conditional/biased/0.1/Biased_handwriting_sample__4.png)
-![image](generated_samples/conditional/biased/0.1/Biased_handwriting_sample__5.png)
+![image](results/conditional/biased/0.1/Biased_handwriting_sample__1.png)
+![image](results/conditional/biased/0.1/Biased_handwriting_sample__2.png)
+![image](results/conditional/biased/0.1/Biased_handwriting_sample__3.png)
+![image](results/conditional/biased/0.1/Biased_handwriting_sample__4.png)
+![image](results/conditional/biased/0.1/Biased_handwriting_sample__5.png)
 
 ## Unbiased samples
 
-![image](generated_samples/conditional/unbiased/Unbiased_handwriting_sample__1.png)
-![image](generated_samples/conditional/unbiased/Unbiased_handwriting_sample__2.png)
-![image](generated_samples/conditional/unbiased/Unbiased_handwriting_sample__3.png)
-![image](generated_samples/conditional/unbiased/Unbiased_handwriting_sample__4.png)
-![image](generated_samples/conditional/unbiased/Unbiased_handwriting_sample__5.png)
-![image](generated_samples/conditional/unbiased/Unbiased_handwriting_sample__6.png)
-![image](generated_samples/conditional/unbiased/Unbiased_handwriting_sample__7.png)
-![image](generated_samples/conditional/unbiased/Unbiased_handwriting_sample__8.png)
-![image](generated_samples/conditional/unbiased/Unbiased_handwriting_sample__9.png)
-![image](generated_samples/conditional/unbiased/Unbiased_handwriting_sample__10.png)
+![image](results/conditional/unbiased/Unbiased_handwriting_sample__1.png)
+![image](results/conditional/unbiased/Unbiased_handwriting_sample__2.png)
+![image](results/conditional/unbiased/Unbiased_handwriting_sample__3.png)
+![image](results/conditional/unbiased/Unbiased_handwriting_sample__4.png)
+![image](results/conditional/unbiased/Unbiased_handwriting_sample__5.png)
+![image](results/conditional/unbiased/Unbiased_handwriting_sample__6.png)
+![image](results/conditional/unbiased/Unbiased_handwriting_sample__7.png)
+![image](results/conditional/unbiased/Unbiased_handwriting_sample__8.png)
+![image](results/conditional/unbiased/Unbiased_handwriting_sample__9.png)
+![image](results/conditional/unbiased/Unbiased_handwriting_sample__10.png)
 
 ## Slightly biased samples (bias = 0.1)
 
