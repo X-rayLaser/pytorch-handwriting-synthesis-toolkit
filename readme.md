@@ -2,23 +2,18 @@
 
 # Introduction
 
-This toolkit contains utilities used to replicate some of the experiments described in Alex Graves's paper Generating Sequences With Recurrent Neural Networks. Concretely, this repository focuses on handwriting prediction and handwriting synthesis sections.
+This toolkit contains utilities used to replicate some of the experiments described in Alex Graves's paper 
+Generating Sequences With Recurrent Neural Networks. Concretely, this repository focuses on handwriting 
+prediction and handwriting synthesis sections.
 
-The repository includes almost everything that one might need for running the experiments. It provides a complete working pipeline to take the dataset, train the model and generate samples. One only needs to provide the dataset. Scripts will take of everything else, including data preprocessing and normalization.
+The repository includes almost everything that one might need for running the experiments. 
+It provides a complete working pipeline to take the dataset, train the model and generate samples. 
+One only needs to provide the dataset. Scripts will take of everything else, including data preprocessing and normalization.
 
-The implementation closely follows the paper, from model architectures to training setup. However, it also provides some customization (such as choosing the batch size, the maximum length of the sequences, etc.)
+The implementation closely follows the paper, from model architectures to training setup. 
+However, it also provides some customization (such as choosing the batch size, 
+the maximum length of the sequences, etc.)
 In addition, the code can work with a custom dataset.
-
-
-Supported functionality:
-- training prediction network
-- training synthesis network
-- (unconditional) sampling from the prediction network
-- (conditional) sampling from synthesis network (text -> handwriting)
-- visualization of attention weights computed by synthesis network
-- biased sampling
-- training can be paused and resumed
-- training on custom dataset
 
 # Installation
 
@@ -56,7 +51,7 @@ Download the data set and unzip it into iam_ondb_home folder. The layout of the 
 
 Extract data examples from IAM-onDB dataset, preprocess it and save it into "data" directory:
 ```
-python prepare_data.py data iam 2000 200 iam_ondb_home
+python prepare_data.py data iam 9500 0 iam_ondb_home -l 700
 ```
 
 After running this command, you should see a new folder called "data" containing 3 files:
@@ -67,32 +62,30 @@ After running this command, you should see a new folder called "data" containing
 └── val.h5
 ```
 
-Start training synthesis network for 50 epoch with batch size 32 (this might a lot of time, even on GPU).
+Start training synthesis network for 50 epoch with a batch size 32 (this might a lot of time, even on GPU).
 ```
 python train.py -b 32 -e 50 -i 300 data checkpoints
 ```
 
 Create 1 handwriting for the string 'Text to be converted to handwriting'.
 ```
-python synthesize.py data checkpoints/model_at_epoch_2.pt 'Text to be converted to handwriting ' -b 1
+python synthesize.py data checkpoints/model_at_epoch_50.pt 'Text to be converted to handwriting ' -b 1
 ```
 
 This section very briefly describes steps needed to train (conditional) synthesis network.
 For more details, see dedicated sections below.
 
-# The guide
-
-## Data preparation
+# Data preparation
 The toolkit already comes with a built-in data preparation utility. 
 However, it requires a so-called data provider. If you want to use the IAM-onDB dataset, 
 no further action is necessary. Otherwise, you have to write your own to let the toolkit 
 know how to extract the data.
 
 Once there is a provider class, the toolkit will automatically preprocess data and save it. 
-The preprocessing only involves mainly involves the following steps:
+The preprocessing mainly involves the following steps:
 - flattening every raw handwriting into a list of 3-element tuples  
 (containing x and y coordinates as well as End-Of-Stroke flag)
-- replacing every coordinate in a list of into its offset from the previous one
+- replacing every coordinate with its offset from the previous one
 - truncating the sequences longer than a specified threshold
 
 The steps above apply only to the handwriting portion of the data. 
@@ -108,7 +101,7 @@ The command expects at least two arguments: a path to a directory that will
 store prepared data and a name of a data provider. The name must match the 
 data provider's name attributes (for example, iam for IAMonDBProvider class).
 The data provider class might have __init__ method that takes arguments 
-(as is the case for iam provider). If that's the case, you need to pass them 
+(as is the case with iam provider). If that's the case, you need to pass them 
 in when calling the script.
 
 An optional parameter --max_len sets the maximum length of handwriting. 
@@ -116,7 +109,7 @@ Any handwriting longer than max_len is going to be truncated to max_len points.
 
 For more details on the command usage, see the Commands section.
 
-## Implementing custom data provider
+# Implementing custom data provider
 
 The data provider is a class with a class attribute "name" and two methods: 
 get_training_data and get_validation_data.
@@ -176,11 +169,13 @@ the data provider returns or yields.
 Note that name attribute we added to the class. We can now use it to tell 
 the preparation script to use the data provider class with that name.
 It's time to test the provider:
+```
 python prepare_data.py temp_data dummy
+```
 You should see a directory temp_data containing HDF5 files and one text file 
 with the text "Hi".
 
-## Training
+# Training
 
 After preparing the data, running "train.py" script will start or
 resume training a network.
@@ -198,14 +193,14 @@ load the model weights and continue training.
 Finally, after specified number iterations, the script will sample 
 a few hand writings from a network and save them in a folder.
 
-### Using custom character set
+## Using custom character set
 By default, the script will use character set stored under <prepared_data_folder>/charset.txt.
 This file contains all characters that were found by scanning the text part of the dataset.
 This might include digits, punctuation as well as other non-letter characters.
 You might want to restrict the set to contain only white-space and letters. Just create a new text file and
 populate it with characters that you want your synthesis network to be able to produce.
 
-## Sampling from Handwriting synthesis network
+# Sampling from Handwriting synthesis network
 
 Once you have a trained synthesis model, you can use it to convert a plain text into a handwritten one.
 This can be done with *synthesize.py* script. The script will take a text and generate a specified number of
@@ -243,7 +238,7 @@ We trained the synthesis network to predict next normalized offset of the point 
 To convert these normalized offsets into actual coordinates, we need to reverse the preprocessing and normalization
 steps.
 
-### Biased sampling
+## Biased sampling
 You can control the tradeoff between diversity and quality of produced
 samples by passing optional parameter -b (or --bias).
 Higher values result in a cleaner, nicer looking hand writings,
@@ -251,7 +246,7 @@ while lower values result in less readable but more diverse samples.
 
 By default, bias equals to 0 which corresponds to unbiased sampling.
 
-## Sampling from a prediction network (unconditional)
+# Sampling from a prediction network (unconditional)
 To sample from a prediction network, you can use sample.py script.
 It expects 3 required arguments: path to prepared dataset, path to pretrained
 prediction network and path to directory that will store generated samples.
@@ -261,7 +256,7 @@ Run the command below to generate 1 handwriting and save it to samples_dir folde
 python sample.py data checkpoints/model_at_epoch_2.pt samples_dir
 ```
 
-# Commands manual
+# Commands
 
 ## prepare_data.py
 Extract (optionally split), preprocess and save data in specified destination folder.
@@ -293,7 +288,8 @@ Start/resume training prediction or synthesis network.
 ```
 $ python train.py --help
 usage: train.py [-h] [-u] [-b BATCH_SIZE] [-e EPOCHS] [-i INTERVAL]
-                [-c CHARSET] [--clip1 CLIP1] [--clip2 CLIP2]
+                [-c CHARSET] [--samples_dir SAMPLES_DIR] [--clip1 CLIP1]
+                [--clip2 CLIP2]
                 data_dir model_dir
 
 positional arguments:
@@ -313,6 +309,8 @@ optional arguments:
                         Iterations between sampling
   -c CHARSET, --charset CHARSET
                         Path to the charset file
+  --samples_dir SAMPLES_DIR
+                        Path to the directory that will store samples
   --clip1 CLIP1         Gradient clipping value for output layer. When omitted
                         or set to zero, no clipping is done.
   --clip2 CLIP2         Gradient clipping value for lstm layers. When omitted
@@ -363,12 +361,12 @@ Generate a handwriting(s) for a given string of text.
 ```
 $ python synthesize.py --help
 usage: synthesize.py [-h] [-b BIAS] [--trials TRIALS] [--show_weights]
-                     [-c CHARSET]
-                     data_dir path text
+                     [-c CHARSET] [--samples_dir SAMPLES_DIR]
+                     data_dir model_path text
 
 positional arguments:
   data_dir              Path to prepared dataset directory
-  path                  Path to saved model
+  model_path            Path to saved model
   text                  Text to be converted to handwriting
 
 optional arguments:
@@ -380,10 +378,42 @@ optional arguments:
                         attention weights
   -c CHARSET, --charset CHARSET
                         Path to the charset file
+  --samples_dir SAMPLES_DIR
+                        Path to the directory that will store samples
 ```
 
 
 # Samples
+
+## Biased samples
+
+### Probability bias 2:
+![image](generated_samples/conditional/biased/2/Biased_handwriting_sample__1.png)
+![image](generated_samples/conditional/biased/2/Biased_handwriting_sample__2.png)
+![image](generated_samples/conditional/biased/2/Biased_handwriting_sample__3.png)
+![image](generated_samples/conditional/biased/2/Biased_handwriting_sample__4.png)
+![image](generated_samples/conditional/biased/2/Biased_handwriting_sample__5.png)
+
+### Probability bias 1:
+![image](generated_samples/conditional/biased/1/Biased_handwriting_sample__1.png)
+![image](generated_samples/conditional/biased/1/Biased_handwriting_sample__2.png)
+![image](generated_samples/conditional/biased/1/Biased_handwriting_sample__3.png)
+![image](generated_samples/conditional/biased/1/Biased_handwriting_sample__4.png)
+![image](generated_samples/conditional/biased/1/Biased_handwriting_sample__5.png)
+
+### Probability bias 0.5:
+![image](generated_samples/conditional/biased/0.5/Biased_handwriting_sample__1.png)
+![image](generated_samples/conditional/biased/0.5/Biased_handwriting_sample__2.png)
+![image](generated_samples/conditional/biased/0.5/Biased_handwriting_sample__3.png)
+![image](generated_samples/conditional/biased/0.5/Biased_handwriting_sample__4.png)
+![image](generated_samples/conditional/biased/0.5/Biased_handwriting_sample__5.png)
+
+### Probability bias 0.1:
+![image](generated_samples/conditional/biased/0.1/Biased_handwriting_sample__1.png)
+![image](generated_samples/conditional/biased/0.1/Biased_handwriting_sample__2.png)
+![image](generated_samples/conditional/biased/0.1/Biased_handwriting_sample__3.png)
+![image](generated_samples/conditional/biased/0.1/Biased_handwriting_sample__4.png)
+![image](generated_samples/conditional/biased/0.1/Biased_handwriting_sample__5.png)
 
 ## Unbiased samples
 
