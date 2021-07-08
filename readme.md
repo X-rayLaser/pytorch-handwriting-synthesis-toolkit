@@ -428,8 +428,6 @@ optional arguments:
 ![image](results/conditional/unbiased/Unbiased_handwriting_sample__9.png)
 ![image](results/conditional/unbiased/Unbiased_handwriting_sample__10.png)
 
-## Slightly biased samples (bias = 0.1)
-
 # References
 
 [1] [Alex Graves. Generating Sequences With Recurrent Neural Networks](https://arxiv.org/abs/1308.0850)
