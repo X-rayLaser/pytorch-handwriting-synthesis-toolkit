@@ -62,7 +62,7 @@ After running this command, you should see a new folder called "data" containing
 └── val.h5
 ```
 
-Start training synthesis network for 50 epoch with a batch size 32 (this might a lot of time, even on GPU).
+Start training synthesis network for 50 epoch with a batch size 32 (this might take a lot of time, even on GPU).
 ```
 python train.py -b 32 -e 50 -i 300 data checkpoints
 ```

@@ -20,10 +20,14 @@ if __name__ == '__main__':
         "--show_weights", default=False, action="store_true",
         help="When set, will produce a plot: handwriting against attention weights"
     )
+    parser.add_argument(
+        "--heatmap", default=False, action="store_true",
+        help="When set, will produce a heatmap for mixture density outputs"
+    )
+
     parser.add_argument("-c", "--charset", type=str, default='', help="Path to the charset file")
     parser.add_argument("--samples_dir", type=str, default='samples',
                         help="Path to the directory that will store samples")
-
     args = parser.parse_args()
 
     default_charset_path = os.path.join(args.data_dir, 'charset.txt')
@@ -50,14 +54,18 @@ if __name__ == '__main__':
         mu = torch.tensor(dataset.mu)
         sd = torch.tensor(dataset.std)
 
-    synthesizer = utils.HandwritingSynthesizer(
-        model, mu, sd, num_steps=dataset.max_length, stochastic=True
-    )
-
     output_dir = args.samples_dir
     os.makedirs(output_dir, exist_ok=True)
 
-    for i in range(1, args.trials + 1):
-        output_path = os.path.join(output_dir, f'{base_file_name}_{i}.png')
-        synthesizer.synthesize(c, output_path, show_attention=args.show_weights, text=full_text)
-        print(f'Done {i} / {args.trials}')
+    if args.heatmap:
+        output_path = os.path.join(output_dir, f'{base_file_name}_.png')
+        utils.plot_mixture_densities(model, mu, sd, output_path, c)
+    else:
+        synthesizer = utils.HandwritingSynthesizer(
+            model, mu, sd, num_steps=dataset.max_length, stochastic=True
+        )
+
+        for i in range(1, args.trials + 1):
+            output_path = os.path.join(output_dir, f'{base_file_name}_{i}.png')
+            synthesizer.synthesize(c, output_path, show_attention=args.show_weights, text=full_text)
+            print(f'Done {i} / {args.trials}')

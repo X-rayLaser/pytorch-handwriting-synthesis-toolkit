@@ -10,6 +10,7 @@ from matplotlib import collections as mc
 from torch.utils.data import DataLoader
 from . import data
 from .metrics import MovingAverage
+from .losses import BiVariateGaussian
 
 
 class PaddedSequencesBatch:
@@ -221,6 +222,91 @@ def plot_attention_weights(phi, seq, save_path='img.png', text=''):
     axes[1].invert_yaxis()
     plt.savefig(save_path)
     plt.close('all')
+
+
+def plot_mixture_densities(model, norm_mu, norm_sd, save_path, c=None):
+    with torch.no_grad():
+        _plot_densities(model, norm_mu, norm_sd, save_path, c)
+
+
+def _plot_densities(model, norm_mu, norm_sd, save_path, c=None):
+    seq = model.sample_means(context=c, stochastic=True)
+
+    x0 = model.get_initial_input()
+    x = torch.cat([x0.unsqueeze(0), seq.unsqueeze(0)], dim=1)
+
+    if c is not None:
+        (pi, mu, sd, ro), eos = model(x, c)
+    else:
+        (pi, mu, sd, ro), eos = model(x)
+
+    batch_size, num_steps, _ = x.shape
+    assert batch_size == 1
+
+    x = x.squeeze(dim=0)
+
+    # revert normalization
+    seq = x * norm_sd + norm_mu
+
+    # to absolute_coordinates
+    x_hat, y_hat, _ = split_into_components(seq)
+    x_hat = np.array(x_hat)
+    y_hat = np.array(y_hat)
+
+    min_x = math.floor(x_hat.min())
+    min_y = math.floor(y_hat.min())
+
+    max_x = math.ceil(x_hat.max())
+    max_y = math.ceil(y_hat.max())
+
+    x_size = max_x - min_x + 1
+    y_size = max_y - min_y + 1
+
+    factor = 2
+
+    heatmap = np.zeros((y_size // factor, x_size // factor), dtype=np.float)
+
+    num_components = pi.shape[2]
+
+    deltas = np.indices(heatmap.shape).transpose(1, 2, 0) * factor
+    deltas = torch.tensor(deltas)
+
+    for t in range(1, num_steps):
+        print(t)
+        x_prev = round(x_hat[t - 1].item())
+        y_prev = round(y_hat[t - 1].item())
+
+        deltas_x = deltas[:, :, 1] - x_prev
+        deltas_y = deltas[:, :, 0] - y_prev
+
+        deltas_x = (deltas_x - norm_mu[0]) / norm_sd[0]
+        deltas_y = (deltas_y - norm_mu[1]) / norm_sd[1]
+
+        pi_t = pi[0, t]
+        mu_t = mu[0, t]
+        sd_t = sd[0, t]
+        ro_t = ro[0, t]
+
+        densities = torch.zeros(heatmap.shape, dtype=torch.float)
+
+        for j in range(num_components):
+            mu1 = mu_t[j]
+            mu2 = mu_t[num_components + j]
+
+            sd1 = sd_t[j]
+            sd2 = sd_t[num_components + j]
+            ro_j = ro_t[j]
+
+            d = pi_t[j] * BiVariateGaussian((mu1, mu2), (sd1, sd2), ro_j).density(deltas_x, deltas_y)
+            densities += d
+
+        heatmap += densities.numpy()
+
+    plt.rcParams["figure.figsize"] = [16, 9]
+    plt.imshow(heatmap, cmap='hot')
+    plt.colorbar()
+    plt.savefig(save_path)
+    # todo: sliding window approach (compute probabilities only for neighboring patch of previous point)
 
 
 def get_strokes(x, y, eos):
