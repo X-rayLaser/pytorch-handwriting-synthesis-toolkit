@@ -276,13 +276,31 @@ def _plot_densities(model, norm_mu, norm_sd, save_path, c=None):
     deltas[:, :, 1] += min_x
 
     deltas = torch.tensor(deltas)
+    window_size = 100
+
+    def clipped_coord(coord, min_c, max_c):
+        v = int(round(coord / factor))
+        v = max(v, min_c)
+        return min(v, max_c)
+
+    def get_window(x, y):
+        half_window = int(round(window_size / 2))
+        x_left = clipped_coord(x - half_window - min_x, 0, x_size - 1)
+        x_right = clipped_coord(x + half_window - min_x, 0, x_size - 1)
+        y_bottom = clipped_coord(y - half_window - min_y, 0, y_size - 1)
+        y_top = clipped_coord(y + half_window - min_y, 0, y_size - 1)
+
+        return x_left, x_right, y_bottom, y_top
 
     for t in range(1, num_steps):
         x_prev = round(x_hat[t - 1].item())
         y_prev = round(y_hat[t - 1].item())
 
-        deltas_x = deltas[:, :, 1] - x_prev
-        deltas_y = deltas[:, :, 0] - y_prev
+        x_left, x_right, y_bottom, y_top = get_window(x_prev, y_prev)
+
+        clipped_deltas = deltas[y_bottom:y_top, x_left: x_right]
+        deltas_x = clipped_deltas[:, :, 1] - x_prev
+        deltas_y = clipped_deltas[:, :, 0] - y_prev
 
         deltas_x = (deltas_x - norm_mu[0]) / norm_sd[0]
         deltas_y = (deltas_y - norm_mu[1]) / norm_sd[1]
@@ -292,7 +310,7 @@ def _plot_densities(model, norm_mu, norm_sd, save_path, c=None):
         sd_t = sd[0, t]
         ro_t = ro[0, t]
 
-        densities = torch.zeros(heatmap.shape, dtype=torch.float)
+        densities = torch.zeros(clipped_deltas.shape[:-1], dtype=torch.float)
 
         for j in range(num_components):
             mu1 = mu_t[j]
@@ -305,13 +323,13 @@ def _plot_densities(model, norm_mu, norm_sd, save_path, c=None):
             d = pi_t[j] * BiVariateGaussian((mu1, mu2), (sd1, sd2), ro_j).density(deltas_x, deltas_y)
             densities += d
 
-        heatmap += densities.numpy()
+        heatmap[y_bottom:y_top, x_left:x_right] += densities.numpy()
 
     figure = plt.figure(figsize=[16, 9], dpi=400)
-    plt.imshow(heatmap, cmap='hot')
+    plt.imshow(heatmap, cmap='hot', vmin=0, vmax=heatmap.max() / 2)
     plt.colorbar()
     plt.savefig(save_path, dpi=figure.dpi)
-    # todo: sliding window approach (compute probabilities only for neighboring patch of previous point)
+    # todo: refactor
 
 
 def get_strokes(x, y, eos):
