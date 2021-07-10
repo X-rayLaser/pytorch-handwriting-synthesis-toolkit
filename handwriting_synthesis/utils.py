@@ -262,17 +262,22 @@ def _plot_densities(model, norm_mu, norm_sd, save_path, c=None):
     x_size = max_x - min_x + 1
     y_size = max_y - min_y + 1
 
-    factor = 2
+    factor = 4
 
-    heatmap = np.zeros((y_size // factor, x_size // factor), dtype=np.float)
+    x_size = int(math.ceil(x_size / factor))
+    y_size = int(math.ceil(y_size / factor))
+
+    heatmap = np.zeros((y_size, x_size), dtype=np.float)
 
     num_components = pi.shape[2]
 
     deltas = np.indices(heatmap.shape).transpose(1, 2, 0) * factor
+    deltas[:, :, 0] += min_y
+    deltas[:, :, 1] += min_x
+
     deltas = torch.tensor(deltas)
 
     for t in range(1, num_steps):
-        print(t)
         x_prev = round(x_hat[t - 1].item())
         y_prev = round(y_hat[t - 1].item())
 
@@ -302,10 +307,10 @@ def _plot_densities(model, norm_mu, norm_sd, save_path, c=None):
 
         heatmap += densities.numpy()
 
-    plt.rcParams["figure.figsize"] = [16, 9]
+    figure = plt.figure(figsize=[16, 9], dpi=400)
     plt.imshow(heatmap, cmap='hot')
     plt.colorbar()
-    plt.savefig(save_path)
+    plt.savefig(save_path, dpi=figure.dpi)
     # todo: sliding window approach (compute probabilities only for neighboring patch of previous point)
 
 

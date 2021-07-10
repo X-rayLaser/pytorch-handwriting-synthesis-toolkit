@@ -361,7 +361,7 @@ Generate a handwriting(s) for a given string of text.
 ```
 $ python synthesize.py --help
 usage: synthesize.py [-h] [-b BIAS] [--trials TRIALS] [--show_weights]
-                     [-c CHARSET] [--samples_dir SAMPLES_DIR]
+                     [--heatmap] [-c CHARSET] [--samples_dir SAMPLES_DIR]
                      data_dir model_path text
 
 positional arguments:
@@ -376,6 +376,8 @@ optional arguments:
   --trials TRIALS       Number of attempts
   --show_weights        When set, will produce a plot: handwriting against
                         attention weights
+  --heatmap             When set, will produce a heatmap for mixture density
+                        outputs
   -c CHARSET, --charset CHARSET
                         Path to the charset file
   --samples_dir SAMPLES_DIR
