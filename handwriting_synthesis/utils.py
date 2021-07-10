@@ -226,110 +226,159 @@ def plot_attention_weights(phi, seq, save_path='img.png', text=''):
 
 def plot_mixture_densities(model, norm_mu, norm_sd, save_path, c=None):
     with torch.no_grad():
-        _plot_densities(model, norm_mu, norm_sd, save_path, c)
+
+        DensityPlotter(model, norm_mu, norm_sd, save_path, c).plot()
 
 
-def _plot_densities(model, norm_mu, norm_sd, save_path, c=None):
-    seq = model.sample_means(context=c, stochastic=True)
+class DensityPlotter:
+    def __init__(self, model, norm_mu, norm_sd, save_path, c=None):
+        self.model = model
+        self.norm_mu = norm_mu
+        self.norm_sd = norm_sd
+        self.save_path = save_path
+        self.c = c
 
-    x0 = model.get_initial_input()
-    x = torch.cat([x0.unsqueeze(0), seq.unsqueeze(0)], dim=1)
+    def plot(self):
+        seq, (pi, mu, sd, ro) = self.get_predictions()
+        num_steps = len(seq)
 
-    if c is not None:
-        (pi, mu, sd, ro), eos = model(x, c)
-    else:
-        (pi, mu, sd, ro), eos = model(x)
+        # to absolute_coordinates
+        x_hat, y_hat, _ = split_into_components(seq)
+        x_hat = np.array(x_hat)
+        y_hat = np.array(y_hat)
 
-    batch_size, num_steps, _ = x.shape
-    assert batch_size == 1
+        min_x = math.floor(x_hat.min())
+        min_y = math.floor(y_hat.min())
 
-    x = x.squeeze(dim=0)
+        max_x = math.ceil(x_hat.max())
+        max_y = math.ceil(y_hat.max())
 
-    # revert normalization
-    seq = x * norm_sd + norm_mu
+        width = max_x - min_x + 1
+        height = max_y - min_y + 1
 
-    # to absolute_coordinates
-    x_hat, y_hat, _ = split_into_components(seq)
-    x_hat = np.array(x_hat)
-    y_hat = np.array(y_hat)
+        factor = 4
+        window_size = 100
 
-    min_x = math.floor(x_hat.min())
-    min_y = math.floor(y_hat.min())
+        heatmap_builder = HeatmapBuilder(min_x, min_y, width, height, factor)
 
-    max_x = math.ceil(x_hat.max())
-    max_y = math.ceil(y_hat.max())
+        for t in range(1, num_steps):
+            x_prev = round(x_hat[t - 1].item())
+            y_prev = round(y_hat[t - 1].item())
 
-    x_size = max_x - min_x + 1
-    y_size = max_y - min_y + 1
+            def temperature_function(grid):
+                pi_t = pi[0, t]
+                mu_t = mu[0, t]
+                sd_t = sd[0, t]
+                ro_t = ro[0, t]
+                return self.get_densities((pi_t, mu_t, sd_t, ro_t), x_prev, y_prev, grid)
 
-    factor = 4
+            heatmap_builder.overlay_near(x_prev, y_prev, window_size, temperature_function)
+        heatmap = heatmap_builder.heatmap
+        self._do_plot(heatmap, self.save_path)
 
-    x_size = int(math.ceil(x_size / factor))
-    y_size = int(math.ceil(y_size / factor))
+    def get_predictions(self):
+        model = self.model
+        c = self.c
 
-    heatmap = np.zeros((y_size, x_size), dtype=np.float)
+        seq = model.sample_means(context=c, stochastic=True)
 
-    num_components = pi.shape[2]
+        x0 = model.get_initial_input()
+        x = torch.cat([x0.unsqueeze(0), seq.unsqueeze(0)], dim=1)
 
-    deltas = np.indices(heatmap.shape).transpose(1, 2, 0) * factor
-    deltas[:, :, 0] += min_y
-    deltas[:, :, 1] += min_x
+        if c is not None:
+            mixture, eos = model(x, c)
+        else:
+            mixture, eos = model(x)
 
-    deltas = torch.tensor(deltas)
-    window_size = 100
+        x = x.squeeze(dim=0)
 
-    def clipped_coord(coord, min_c, max_c):
-        v = int(round(coord / factor))
+        points = self._unnormalize(x, self.norm_mu, self.norm_sd)
+
+        return points, mixture
+
+    def get_densities(self, mixture, x_prev, y_prev, grid):
+        pi, mu, sd, ro = mixture
+
+        deltas_x = grid[:, :, 1] - x_prev
+        deltas_y = grid[:, :, 0] - y_prev
+
+        deltas_x = self._normalize(deltas_x, self.norm_mu[0], self.norm_sd[0])
+        deltas_y = self._normalize(deltas_y, self.norm_mu[1], self.norm_sd[1])
+
+        num_components = len(pi)
+
+        densities = torch.zeros(grid.shape[:-1], dtype=torch.float)
+
+        for j in range(num_components):
+            mu1 = mu[j]
+            mu2 = mu[num_components + j]
+
+            sd1 = sd[j]
+            sd2 = sd[num_components + j]
+            ro_j = ro[j]
+
+            d = pi[j] * BiVariateGaussian((mu1, mu2), (sd1, sd2), ro_j).density(deltas_x, deltas_y)
+            densities += d
+        return densities
+
+    def _do_plot(self, heatmap, save_path):
+        figure = plt.figure(figsize=[16, 9], dpi=400)
+        plt.imshow(heatmap, cmap='hot', vmin=0, vmax=heatmap.max() / 4)
+        plt.colorbar()
+        plt.savefig(save_path, dpi=figure.dpi)
+
+    def _normalize(self, t, mu, sd):
+        return (t - mu) / sd
+
+    def _unnormalize(self, t, mu, sd):
+        return t * sd + mu
+
+
+class HeatmapBuilder:
+    def __init__(self, x0, y0, width, height, factor):
+        width = int(math.ceil(width / factor))
+        height = int(math.ceil(height / factor))
+        self._x0 = x0
+        self._y0 = y0
+        self._width = width
+        self._height = height
+        self._factor = factor
+        self._heatmap = np.zeros((height, width), dtype=np.float)
+
+        grid = np.indices(self._heatmap.shape).transpose(1, 2, 0) * factor
+        grid[:, :, 0] += y0
+        grid[:, :, 1] += x0
+        self._grid = torch.tensor(grid)
+
+    @property
+    def heatmap(self):
+        return self._heatmap
+
+    def overlay(self, temperature_function):
+        temperatures = temperature_function(self._grid)
+        assert temperatures.shape == self._heatmap.shape
+        self._heatmap += temperatures
+
+    def overlay_near(self, x, y, window_size, temperature_function):
+        x_left, x_right, y_bottom, y_top = self.get_window(x, y, window_size)
+        cropped_grid = self._grid[y_bottom:y_top, x_left:x_right]
+        temperatures = temperature_function(cropped_grid)
+        assert temperatures.shape == cropped_grid.shape[:-1]
+        self._heatmap[y_bottom:y_top, x_left:x_right] += temperatures.numpy()
+
+    def clipped_coord(self, coord, min_c, max_c):
+        v = int(round(coord / self._factor))
         v = max(v, min_c)
         return min(v, max_c)
 
-    def get_window(x, y):
+    def get_window(self, x, y, window_size):
         half_window = int(round(window_size / 2))
-        x_left = clipped_coord(x - half_window - min_x, 0, x_size - 1)
-        x_right = clipped_coord(x + half_window - min_x, 0, x_size - 1)
-        y_bottom = clipped_coord(y - half_window - min_y, 0, y_size - 1)
-        y_top = clipped_coord(y + half_window - min_y, 0, y_size - 1)
+        x_left = self.clipped_coord(x - half_window - self._x0, 0, self._width - 1)
+        x_right = self.clipped_coord(x + half_window - self._x0, 0, self._width - 1)
+        y_bottom = self.clipped_coord(y - half_window - self._y0, 0, self._height - 1)
+        y_top = self.clipped_coord(y + half_window - self._y0, 0, self._height - 1)
 
         return x_left, x_right, y_bottom, y_top
-
-    for t in range(1, num_steps):
-        x_prev = round(x_hat[t - 1].item())
-        y_prev = round(y_hat[t - 1].item())
-
-        x_left, x_right, y_bottom, y_top = get_window(x_prev, y_prev)
-
-        clipped_deltas = deltas[y_bottom:y_top, x_left: x_right]
-        deltas_x = clipped_deltas[:, :, 1] - x_prev
-        deltas_y = clipped_deltas[:, :, 0] - y_prev
-
-        deltas_x = (deltas_x - norm_mu[0]) / norm_sd[0]
-        deltas_y = (deltas_y - norm_mu[1]) / norm_sd[1]
-
-        pi_t = pi[0, t]
-        mu_t = mu[0, t]
-        sd_t = sd[0, t]
-        ro_t = ro[0, t]
-
-        densities = torch.zeros(clipped_deltas.shape[:-1], dtype=torch.float)
-
-        for j in range(num_components):
-            mu1 = mu_t[j]
-            mu2 = mu_t[num_components + j]
-
-            sd1 = sd_t[j]
-            sd2 = sd_t[num_components + j]
-            ro_j = ro_t[j]
-
-            d = pi_t[j] * BiVariateGaussian((mu1, mu2), (sd1, sd2), ro_j).density(deltas_x, deltas_y)
-            densities += d
-
-        heatmap[y_bottom:y_top, x_left:x_right] += densities.numpy()
-
-    figure = plt.figure(figsize=[16, 9], dpi=400)
-    plt.imshow(heatmap, cmap='hot', vmin=0, vmax=heatmap.max() / 2)
-    plt.colorbar()
-    plt.savefig(save_path, dpi=figure.dpi)
-    # todo: refactor
 
 
 def get_strokes(x, y, eos):
