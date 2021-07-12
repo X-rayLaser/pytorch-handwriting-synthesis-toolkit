@@ -225,9 +225,7 @@ def plot_attention_weights(phi, seq, save_path='img.png', text=''):
 
 
 def plot_mixture_densities(model, norm_mu, norm_sd, save_path, c=None):
-    with torch.no_grad():
-
-        DensityPlotter(model, norm_mu, norm_sd, save_path, c).plot()
+    DensityPlotter(model, norm_mu, norm_sd, save_path, c).plot()
 
 
 class DensityPlotter:
@@ -239,7 +237,17 @@ class DensityPlotter:
         self.c = c
 
     def plot(self):
-        seq, (pi, mu, sd, ro) = self.get_predictions()
+        with torch.no_grad():
+            x = self._generate_input_sequence()
+            self._plot(x)
+
+    def plot_for_input(self, x):
+        assert x.shape[0] == 1
+        with torch.no_grad():
+            self._plot(x)
+
+    def _plot(self, x):
+        seq, (pi, mu, sd, ro) = self._get_predictions(x)
         num_steps = len(seq)
 
         # to absolute_coordinates
@@ -270,13 +278,13 @@ class DensityPlotter:
                 mu_t = mu[0, t]
                 sd_t = sd[0, t]
                 ro_t = ro[0, t]
-                return self.get_densities((pi_t, mu_t, sd_t, ro_t), x_prev, y_prev, grid)
+                return self._get_densities((pi_t, mu_t, sd_t, ro_t), x_prev, y_prev, grid)
 
             heatmap_builder.overlay_near(x_prev, y_prev, window_size, temperature_function)
         heatmap = heatmap_builder.heatmap
         self._do_plot(heatmap, self.save_path)
 
-    def get_predictions(self):
+    def _generate_input_sequence(self):
         model = self.model
         c = self.c
 
@@ -285,10 +293,13 @@ class DensityPlotter:
         x0 = model.get_initial_input()
         x = torch.cat([x0.unsqueeze(0), seq.unsqueeze(0)], dim=1)
 
-        if c is not None:
-            mixture, eos = model(x, c)
+        return x
+
+    def _get_predictions(self, x):
+        if self.c is not None:
+            mixture, eos = self.model(x, self.c)
         else:
-            mixture, eos = model(x)
+            mixture, eos = self.model(x)
 
         x = x.squeeze(dim=0)
 
@@ -296,7 +307,7 @@ class DensityPlotter:
 
         return points, mixture
 
-    def get_densities(self, mixture, x_prev, y_prev, grid):
+    def _get_densities(self, mixture, x_prev, y_prev, grid):
         pi, mu, sd, ro = mixture
 
         deltas_x = grid[:, :, 1] - x_prev
