@@ -57,6 +57,14 @@ if __name__ == '__main__':
     output_dir = args.samples_dir
     os.makedirs(output_dir, exist_ok=True)
 
+    if os.path.isfile(args.text):
+        with open(args.text) as f:
+            text = f.read()
+
+        output_path = os.path.join(output_dir, f'{base_file_name}_.png')
+        utils.text_to_document(model, mu, sd, tokenizer, text, output_path)
+        raise Exception('Done')
+
     if args.heatmap:
         output_path = os.path.join(output_dir, f'{base_file_name}_.png')
         utils.plot_mixture_densities(model, mu, sd, output_path, c)

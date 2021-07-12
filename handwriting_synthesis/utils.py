@@ -158,19 +158,20 @@ def visualize_strokes(seq, save_path='img.png', lines=False):
     im = create_strokes_image(seq, lines)
     if im:
         im.save(save_path)
+    return
 
 
-def create_strokes_image(seq, lines=False):
+def create_strokes_image(seq, lines=False, shrink_factor=1):
     x, y, eos = split_into_components(seq)
-    x = np.array(x)
-    y = np.array(y)
+    x = np.array(x) / shrink_factor
+    y = np.array(y) / shrink_factor
     x_with_offset = x - np.floor(x.min())
     y_with_offset = y - np.floor(y.min())
 
     width = int(x_with_offset.max() + 10)
     height = int(y_with_offset.max() + 10)
 
-    if width * height > 8000 * 2000:
+    if width * height > 10000 * 2000:
         return
 
     im = Image.new(mode='L', size=(width, height), color=255)
@@ -178,6 +179,7 @@ def create_strokes_image(seq, lines=False):
     canvas = ImageDraw.Draw(im)
 
     if lines:
+
         for stroke in get_strokes(x_with_offset, y_with_offset, eos):
             canvas.line(stroke, width=10, fill=0)
     else:
@@ -446,8 +448,8 @@ class HandwritingSynthesizer:
     def synthesize(self, c, output_path, show_attention=False, text=''):
         try:
             if show_attention:
-                sampled_handwriting, phi = self.model.sample_means_with_attention(context=c, steps=self.num_steps,
-                                                                                  stochastic=self.stochastic)
+                sampled_handwriting, phi, _ = self.model.sample_means_with_attention(context=c, steps=self.num_steps,
+                                                                                     stochastic=self.stochastic)
                 sampled_handwriting = sampled_handwriting.cpu()
                 sampled_handwriting = sampled_handwriting * self.sd + self.mu
                 plot_attention_weights(phi, sampled_handwriting, output_path, text=text)
@@ -459,6 +461,65 @@ class HandwritingSynthesizer:
                 visualize_strokes(sampled_handwriting, output_path, lines=True)
         except Exception:
             traceback.print_exc()
+
+
+def text_to_document(model, mu, sd, tokenizer, text, save_path):
+    lines, priming_line = split_into_lines(text)
+
+    c = data.transcriptions_to_tensor(tokenizer, [priming_line])
+    priming_x = model.sample_means(context=c, steps=700, stochastic=True)
+    priming_x = priming_x.unsqueeze(0)
+
+    # primed_x usually will not write the last character in th priming_line
+    #c = c[:, :-1]
+    pil_images = []
+    for line in lines:
+        print(f'"{line}"')
+
+        s = data.transcriptions_to_tensor(tokenizer, [line])
+        sample = model.sample_primed(priming_x, c, s, steps=1500)
+        points_seq = sample.cpu() * sd + mu
+        im = create_strokes_image(points_seq, lines=True, shrink_factor=2)
+        pil_images.append(im)
+
+    image = merge_images(*pil_images)
+    image.save(save_path)
+
+
+def split_into_lines(text):
+    words = text.split(' ')
+
+    sentinel = ' '
+
+    lines = []
+    line_words = []
+    for i, word in enumerate(words):
+        line_words.append(word.strip().replace('\n', ''))
+        if (i + 1) % 5 == 0:
+            line = ' '.join(line_words) + sentinel
+            lines.append(line)
+            line_words = []
+
+    if line_words:
+        lines.append(' '.join(line_words))
+
+    priming_line = ' '.join(words[:2]) + sentinel + sentinel
+    print(f'"{priming_line}"')
+    return lines, priming_line
+
+
+def merge_images(*images):
+    max_width = max([im.width for im in images])
+    combined_height = sum(im.height for im in images)
+    image = Image.new(mode='L', size=(max_width, combined_height), color=255)
+
+    prev_height = 0
+
+    for im in images:
+        image.paste(im, (0, prev_height))
+        prev_height += im.height
+
+    return image
 
 
 def get_charset_path_or_raise(charset_path, default_path):

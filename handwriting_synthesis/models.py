@@ -202,6 +202,38 @@ class SynthesisNetwork(jit.ScriptModule):
         outputs, _ = self.sample_means_with_attention(context, steps, stochastic)
         return outputs
 
+    def sample_primed(self, primed_x, c, s, steps=700):
+        c = torch.cat([c, s], dim=1)
+        c = c.to(self.device)
+
+        batch_size, u, _ = c.shape
+        assert batch_size == 1
+
+        primed_x = torch.cat([self.get_initial_input().unsqueeze(0), primed_x], dim=1)
+        w = self.get_initial_window(batch_size)
+        k = torch.zeros(batch_size, self.gaussian_components, device=self.device, dtype=torch.float32)
+
+        hidden1, hidden2, hidden3 = self.get_all_initial_states(batch_size)
+
+        priming_steps = primed_x.shape[1]
+
+        for t in range(priming_steps):
+            x = primed_x[:, t].unsqueeze(1)
+
+            x_with_w = torch.cat([x, w], dim=-1)
+            h1, hidden1 = self.lstm1(x_with_w, hidden1)
+
+            phi, k = self.window(h1, c, k)
+
+            w = self.window.matmul_3d(phi, c)
+
+            mixture, hidden2, hidden3 = self.compute_mixture(x, h1, w, hidden2, hidden3)
+
+        states = (hidden1, hidden2, hidden3)
+        outputs, _ = self._sample_sequence(x, c, w, k, states, stochastic=True, steps=steps)
+
+        return outputs
+
     def sample_means_with_attention(self, context=None, steps=700, stochastic=False):
         c = context.to(self.device)
         batch_size, u, _ = c.shape
@@ -210,7 +242,13 @@ class SynthesisNetwork(jit.ScriptModule):
         w = self.get_initial_window(batch_size)
         k = torch.zeros(batch_size, self.gaussian_components, device=self.device, dtype=torch.float32)
 
-        hidden1, hidden2, hidden3 = self.get_all_initial_states(batch_size)
+        states = self.get_all_initial_states(batch_size)
+
+        return self._sample_sequence(x, c, w, k, states, stochastic, steps)
+
+    def _sample_sequence(self, x, c, w, k, states, stochastic=True, steps=700):
+        hidden1, hidden2, hidden3 = states
+        _, u, _ = c.shape
 
         outputs = []
         attention_weights = []
@@ -227,7 +265,7 @@ class SynthesisNetwork(jit.ScriptModule):
             mixture = self.squeeze(mixture)
             x_temp = self.get_mean_prediction(mixture, stochastic=stochastic).unsqueeze(0)
 
-            if self._is_end_of_string(phi, u):
+            if self._is_end_of_string(phi, u, x_temp):
                 x_temp[0, 2] = 1.0
                 outputs.append(x_temp)
                 break
@@ -237,8 +275,10 @@ class SynthesisNetwork(jit.ScriptModule):
 
         return torch.cat(outputs, dim=0), torch.cat(attention_weights, dim=0)
 
-    def _is_end_of_string(self, phi, string_length):
-        return phi[0, 0].argmax() == string_length - 1
+    def _is_end_of_string(self, phi, string_length, x_temp):
+        last_phi = phi[0, 0, string_length - 1]
+        is_eos = x_temp[0, 2] > 0.5
+        return last_phi > 0.8 or (phi[0, 0].argmax() == string_length - 1 and is_eos)
 
     def squeeze(self, mixture: Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]):
         pi, mu, sd, ro, eos = mixture
