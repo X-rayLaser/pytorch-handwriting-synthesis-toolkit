@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import torch
 from handwriting_synthesis import utils
 from handwriting_synthesis.data import transcriptions_to_tensor
@@ -14,17 +15,15 @@ class Callback:
 
 
 class EpochModelCheckpoint(Callback):
-    def __init__(self, model, save_dir, save_interval):
-        self._model = model
+    def __init__(self, synthesizer, save_dir, save_interval):
+        self._synthesizer = synthesizer
         self._save_dir = save_dir
         self._save_interval = save_interval
 
-        os.makedirs(self._save_dir, exist_ok=True)
-
     def on_epoch(self, epoch):
         if (epoch + 1) % self._save_interval == 0:
-            save_path = os.path.join(self._save_dir, f'model_at_epoch_{epoch + 1}.pt')
-            torch.save(self._model.state_dict(), save_path)
+            epoch_dir = os.path.join(self._save_dir, f'Epoch_{epoch + 1}')
+            self._synthesizer.save(epoch_dir)
 
 
 class IterationModelCheckpoint(Callback):

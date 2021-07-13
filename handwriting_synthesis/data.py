@@ -356,7 +356,7 @@ class Tokenizer:
     def _validate_charset(self, charset):
         collapsed = ''.join(set(charset))
         if len(collapsed) != len(charset):
-            raise BadCharsetError(f'Charset have to contain only unique characters: {charset}')
+            raise BadCharsetError(f'Charset has to contain only unique characters: {charset}')
 
     @property
     def charset(self):
