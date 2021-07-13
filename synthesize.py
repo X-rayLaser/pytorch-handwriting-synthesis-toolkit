@@ -8,7 +8,9 @@ from handwriting_synthesis import data, utils, models, callbacks
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description='Converts a single line of text into a handwriting with a randomly chosen style'
+    )
     parser.add_argument("data_dir", type=str, help="Path to prepared dataset directory")
     parser.add_argument("model_path", type=str, help="Path to saved model")
     parser.add_argument("text", type=str, help="Text to be converted to handwriting")
@@ -56,14 +58,6 @@ if __name__ == '__main__':
 
     output_dir = args.samples_dir
     os.makedirs(output_dir, exist_ok=True)
-
-    if os.path.isfile(args.text):
-        with open(args.text) as f:
-            text = f.read()
-
-        output_path = os.path.join(output_dir, f'{base_file_name}_.png')
-        utils.text_to_document(model, mu, sd, tokenizer, text, output_path)
-        raise Exception('Done')
 
     if args.heatmap:
         output_path = os.path.join(output_dir, f'{base_file_name}_.png')

@@ -161,7 +161,7 @@ def visualize_strokes(seq, save_path='img.png', lines=False):
     return
 
 
-def create_strokes_image(seq, lines=False, shrink_factor=1):
+def create_strokes_image(seq, lines=False, shrink_factor=1, suppress_errors=True):
     x, y, eos = split_into_components(seq)
     x = np.array(x) / shrink_factor
     y = np.array(y) / shrink_factor
@@ -171,8 +171,16 @@ def create_strokes_image(seq, lines=False, shrink_factor=1):
     width = int(x_with_offset.max() + 10)
     height = int(y_with_offset.max() + 10)
 
-    if width * height > 10000 * 2000:
-        return
+    max_size = 10000 * 2000
+
+    if width * height > max_size:
+        if suppress_errors:
+            return
+        else:
+            msg = f'Resulting image is too large. Width {width}, height {height}. ' \
+                  f'This often happens at the beginning of training when model is far from convergence. ' \
+                  f'Predictions are too noisy and go far beyond reasonable range of coordinate offsets.'
+            raise TooLargeImageError(msg)
 
     im = Image.new(mode='L', size=(width, height), color=255)
 
@@ -185,6 +193,10 @@ def create_strokes_image(seq, lines=False, shrink_factor=1):
     else:
         draw_points(x_with_offset, y_with_offset, canvas)
     return im
+
+
+class TooLargeImageError(Exception):
+    pass
 
 
 def draw_points(x, y, canvas):
@@ -448,8 +460,8 @@ class HandwritingSynthesizer:
     def synthesize(self, c, output_path, show_attention=False, text=''):
         try:
             if show_attention:
-                sampled_handwriting, phi, _ = self.model.sample_means_with_attention(context=c, steps=self.num_steps,
-                                                                                     stochastic=self.stochastic)
+                sampled_handwriting, phi = self.model.sample_means_with_attention(context=c, steps=self.num_steps,
+                                                                                  stochastic=self.stochastic)
                 sampled_handwriting = sampled_handwriting.cpu()
                 sampled_handwriting = sampled_handwriting * self.sd + self.mu
                 plot_attention_weights(phi, sampled_handwriting, output_path, text=text)
@@ -470,17 +482,14 @@ def text_to_document(model, mu, sd, tokenizer, text, save_path):
     priming_x = model.sample_means(context=c, steps=700, stochastic=True)
     priming_x = priming_x.unsqueeze(0)
 
-    # primed_x usually will not write the last character in th priming_line
-    #c = c[:, :-1]
     pil_images = []
     for line in lines:
-        print(f'"{line}"')
-
         s = data.transcriptions_to_tensor(tokenizer, [line])
         sample = model.sample_primed(priming_x, c, s, steps=1500)
         points_seq = sample.cpu() * sd + mu
-        im = create_strokes_image(points_seq, lines=True, shrink_factor=2)
+        im = create_strokes_image(points_seq, lines=True, shrink_factor=2, suppress_errors=False)
         pil_images.append(im)
+        print(f'Generated handwriting for a line: "{line}"')
 
     image = merge_images(*pil_images)
     image.save(save_path)
