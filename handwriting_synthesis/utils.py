@@ -475,7 +475,11 @@ class HandwritingSynthesizer:
             traceback.print_exc()
 
 
-def text_to_document(model, mu, sd, tokenizer, text, save_path):
+def text_to_script(synthesizer, text, save_path):
+    model = synthesizer.model
+    mu = synthesizer.mu
+    sd = synthesizer.sd
+    tokenizer = synthesizer.tokenizer
     lines, priming_line = split_into_lines(text)
 
     c = data.transcriptions_to_tensor(tokenizer, [priming_line])
