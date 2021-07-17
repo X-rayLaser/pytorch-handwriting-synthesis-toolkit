@@ -7,6 +7,7 @@ import handwriting_synthesis.callbacks
 import handwriting_synthesis.tasks
 from handwriting_synthesis import training
 from handwriting_synthesis import data, utils, models, metrics
+from handwriting_synthesis.sampling import UnconditionalSampler, HandwritingSynthesizer
 
 
 class ConfigOptions:
@@ -35,7 +36,7 @@ def print_info_message(training_task_verbose, config):
           f'sampling interval (in # iterations): {config.sampling_interval}')
 
 
-def train_model(train_set, val_set, train_task, callbacks, config, training_task_verbose):
+def train_model(train_set, val_set, train_task, callbacks, config, training_task_verbose, sampler):
     print_info_message(training_task_verbose, config)
 
     train_metrics = [metrics.MSE(), metrics.SSE()]
@@ -47,17 +48,31 @@ def train_model(train_set, val_set, train_task, callbacks, config, training_task
     for cb in callbacks:
         loop.add_callback(cb)
 
-    model = loop._trainer._model
-    _, largest_epoch = utils.load_saved_weights(model, check_points_dir=config.model_path)
-    loop.add_callback(handwriting_synthesis.callbacks.EpochModelCheckpoint(model, config.model_path, save_interval=1))
+    sample_class = sampler.__class__
+    _, largest_epoch = sample_class.load_latest(check_points_dir=config.model_path,
+                                                device=torch.device("cpu"))
+
+    saver = handwriting_synthesis.callbacks.EpochModelCheckpoint(
+        sampler, config.model_path, save_interval=1
+    )
+    loop.add_callback(saver)
 
     loop.start(initial_epoch=largest_epoch, epochs=config.epochs)
 
 
 def train_unconditional_handwriting_generator(train_set, val_set, device, config):
-    model = models.HandwritingPredictionNetwork.get_default_model(device)
-    model, epochs = utils.load_saved_weights(model, config.model_path)
-    model = model.to(device)
+    sampler, epochs = UnconditionalSampler.load_latest(config.model_path, device)
+    if sampler:
+        model = sampler.model
+    else:
+        model = models.HandwritingPredictionNetwork.get_default_model(device)
+        model = model.to(device)
+
+    if not sampler:
+        mu = torch.tensor(train_set.mu, dtype=torch.float32)
+        sd = torch.tensor(train_set.std, dtype=torch.float32)
+        tokenizer = data.Tokenizer.from_file(config.charset_path)
+        sampler = UnconditionalSampler(model, mu, sd, tokenizer.charset, num_steps=config.max_length)
 
     if config.output_clip_value == 0 or config.lstm_clip_value == 0:
         clip_values = None
@@ -72,15 +87,21 @@ def train_unconditional_handwriting_generator(train_set, val_set, device, config
     )
 
     train_model(train_set, val_set, train_task, [cb], config,
-                training_task_verbose='Training (unconditional) handwriting prediction model')
+                training_task_verbose='Training (unconditional) handwriting prediction model', sampler=sampler)
 
 
 def train_handwriting_synthesis_model(train_set, val_set, device, config):
     tokenizer = data.Tokenizer.from_file(config.charset_path)
 
     alphabet_size = tokenizer.size
-    model = models.SynthesisNetwork.get_default_model(alphabet_size, device)
-    model, epochs = utils.load_saved_weights(model, config.model_path)
+
+    synthesizer, epochs = HandwritingSynthesizer.load_latest(config.model_path, device)
+
+    if synthesizer:
+        model = synthesizer.model
+    else:
+        model = models.SynthesisNetwork.get_default_model(alphabet_size, device)
+        model = model.to(device)
 
     if config.output_clip_value == 0 or config.lstm_clip_value == 0:
         clip_values = None
@@ -91,6 +112,13 @@ def train_handwriting_synthesis_model(train_set, val_set, device, config):
         tokenizer, device, model, clip_values
     )
 
+    if not synthesizer:
+        mu = torch.tensor(train_set.mu, dtype=torch.float32)
+        sd = torch.tensor(train_set.std, dtype=torch.float32)
+        synthesizer = HandwritingSynthesizer(
+            model, mu, sd, tokenizer.charset, num_steps=config.max_length
+        )
+
     cb = handwriting_synthesis.callbacks.HandwritingSynthesisCallback(
         tokenizer,
         10,
@@ -99,7 +127,7 @@ def train_handwriting_synthesis_model(train_set, val_set, device, config):
     )
 
     train_model(train_set, val_set, train_task, [cb], config,
-                training_task_verbose='Training handwriting synthesis model')
+                training_task_verbose='Training handwriting synthesis model', sampler=synthesizer)
 
 
 def get_device():

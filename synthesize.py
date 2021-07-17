@@ -38,7 +38,9 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
 
-    synthesizer = HandwritingSynthesizer.load(args.model_path, args.bias)
+    device = torch.device("cpu")
+
+    synthesizer = HandwritingSynthesizer.load(args.model_path, device, args.bias)
     output_dir = args.samples_dir
 
     base_file_name = re.sub('[^0-9a-zA-Z]+', '_', args.text)

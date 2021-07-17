@@ -1,6 +1,8 @@
 import re
 import os
 import argparse
+import torch
+
 from handwriting_synthesis import utils
 from handwriting_synthesis.sampling import HandwritingSynthesizer
 
@@ -26,7 +28,8 @@ if __name__ == '__main__':
     base_file_name = re.sub('[^0-9a-zA-Z]+', '_', args.input_path)
     output_path = args.output_path or f'{base_file_name}_.png'
 
-    synthesizer = HandwritingSynthesizer.load(args.model_path, args.bias)
+    device = torch.device("cpu")
+    synthesizer = HandwritingSynthesizer.load(args.model_path, device, args.bias)
 
     with open(args.input_path) as f:
         text = f.read()

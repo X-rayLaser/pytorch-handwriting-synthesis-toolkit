@@ -7,9 +7,9 @@ from .data import transcriptions_to_tensor, Tokenizer
 from . import models
 
 
-class HandwritingSynthesizer:
+class UnconditionalSampler:
     @classmethod
-    def load(cls, model_dir, bias):
+    def load(cls, model_dir, device, bias):
         model_path = cls.get_model_path(model_dir)
         meta_path = cls.get_meta_path(model_dir)
 
@@ -25,14 +25,45 @@ class HandwritingSynthesizer:
 
         alphabet_size = tokenizer.size
 
-        device = torch.device("cpu")
-
-        model = models.SynthesisNetwork.get_default_model(alphabet_size, device, bias=bias)
+        model = cls.create_model_instance(alphabet_size, device, bias)
         model = model.to(device)
 
-        model.load_state_dict(torch.load(model_path, map_location=device))
+        # todo: verify this would work for GPU device as well
+        if device.type == 'cpu':
+            model.load_state_dict(torch.load(model_path, map_location=device))
 
         return cls(model, mu, sd, charset, num_steps=1500)
+
+    @classmethod
+    def create_model_instance(cls, alphabet_size, device, bias):
+        return models.HandwritingPredictionNetwork.get_default_model(device, bias=bias)
+
+    @classmethod
+    def load_latest(cls, check_points_dir, device, bias=0):
+        if not os.path.isdir(check_points_dir):
+            print(f'Cannot load a model because directory {check_points_dir} does not exist')
+            return None, 0
+
+        most_recent = ''
+        largest_epoch = 0
+        for dir_name in os.listdir(check_points_dir):
+            matches = re.findall(r'Epoch_([\d]+)', dir_name)
+            if not matches:
+                continue
+
+            iteration_number = int(matches[0])
+            if iteration_number > largest_epoch:
+                largest_epoch = iteration_number
+                most_recent = dir_name
+
+        if most_recent:
+            recent_checkpoint = os.path.join(check_points_dir, most_recent)
+            sampler = cls.load(recent_checkpoint, device, bias)
+            print(f'Loaded model weights from {recent_checkpoint} file')
+            return sampler, largest_epoch
+        else:
+            print(f'Could not find a model')
+            return None, 0
 
     @classmethod
     def get_model_path(cls, model_dir):
@@ -70,15 +101,33 @@ class HandwritingSynthesizer:
         with open(meta_path, 'w') as f:
             f.write(s)
 
-    def generate_handwriting(self, text, output_path=None):
+    def generate_handwriting(self, text='', output_path=None):
         output_path = output_path or self.derive_file_name(text)
-        c = self._encode_text(text)
+
+        c = self._encode_text(text) if text else None
 
         sampled_handwriting = self.model.sample_means(context=c, steps=self.num_steps,
                                                       stochastic=True)
         sampled_handwriting = sampled_handwriting.cpu()
         sampled_handwriting = self._undo_normalization(sampled_handwriting)
         visualize_strokes(sampled_handwriting, output_path, lines=True)
+
+    def derive_file_name(self, text):
+        extension = '.png'
+        return re.sub('[^0-9a-zA-Z]+', '_', text) + extension
+
+    def _encode_text(self, text):
+        transcription_batch = [text]
+        return transcriptions_to_tensor(self.tokenizer, transcription_batch)
+
+    def _undo_normalization(self, tensor):
+        return tensor * self.sd + self.mu
+
+
+class HandwritingSynthesizer(UnconditionalSampler):
+    @classmethod
+    def create_model_instance(cls, alphabet_size, device, bias):
+        return models.SynthesisNetwork.get_default_model(alphabet_size, device, bias=bias)
 
     def visualize_attention(self, text, output_path=None):
         output_path = output_path or self.derive_file_name(text)
@@ -93,13 +142,3 @@ class HandwritingSynthesizer:
 
         plot_attention_weights(phi, sampled_handwriting, output_path, text=text)
 
-    def derive_file_name(self, text):
-        extension = '.png'
-        return re.sub('[^0-9a-zA-Z]+', '_', text) + extension
-
-    def _encode_text(self, text):
-        transcription_batch = [text]
-        return transcriptions_to_tensor(self.tokenizer, transcription_batch)
-
-    def _undo_normalization(self, tensor):
-        return tensor * self.sd + self.mu
