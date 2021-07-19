@@ -161,15 +161,16 @@ def visualize_strokes(seq, save_path='img.png', lines=False):
     return
 
 
-def create_strokes_image(seq, lines=False, shrink_factor=1, suppress_errors=True):
+def create_strokes_image(seq, lines=False, shrink_factor=1, suppress_errors=True,
+                         horizontal_padding=100, vertical_padding=20):
     x, y, eos = split_into_components(seq)
     x = np.array(x) / shrink_factor
     y = np.array(y) / shrink_factor
-    x_with_offset = x - np.floor(x.min())
-    y_with_offset = y - np.floor(y.min())
+    x_with_offset = x - np.floor(x.min()) + horizontal_padding
+    y_with_offset = y - np.floor(y.min()) + vertical_padding
 
-    width = int(x_with_offset.max() + 10)
-    height = int(y_with_offset.max() + 10)
+    width = int(x_with_offset.max() + horizontal_padding)
+    height = int(y_with_offset.max() + vertical_padding)
 
     max_size = 10000 * 2000
 
