@@ -133,6 +133,22 @@ class TranscriptionFinder(PathFinder):
         validate_parts(parts[:2])
 
 
+class AsciiFileFinder(TranscriptionFinder):
+    def find_path(self, object_id):
+        self.validate_id(object_id)
+        dir_candidate = self._get_directory_path(self.root_dir, object_id)
+        dir_path = self._choose_path(dir_candidate)
+
+        for path in file_iterator(dir_path):
+            location, file_name = os.path.split(path)
+            stem, ext = os.path.splitext(file_name)
+            two_parts = '-'.join(object_id.split('-')[:-1])
+            if stem == two_parts:
+                return path
+
+        raise ObjectDoesNotExistError()
+
+
 def validate_id(id_string):
     parts = id_string.split('-')
     if len(parts) != 3:

@@ -1,3 +1,4 @@
+import os
 from collections import Counter
 from xml.etree import ElementTree as ET
 from xml.etree.ElementTree import ParseError
@@ -31,6 +32,26 @@ class Transcription(list):
 
     def __str__(self):
         return self.text
+
+
+def extract_transcription_from_txt_file(path):
+    with open(path) as f:
+        transcription = Transcription()
+        location, file_name = os.path.split(path)
+        object_id, _ = os.path.splitext(file_name)
+
+        started = False
+        lines = []
+        for line in f.readlines():
+            if started and line.strip():
+                lines.append(line.rstrip())
+            if 'CSR:' in line:
+                started = True
+
+        for i, line in enumerate(lines):
+            transcription.append((f'{object_id}-{i + 1:02}', line))
+
+        return transcription
 
 
 def extract_transcription(path):

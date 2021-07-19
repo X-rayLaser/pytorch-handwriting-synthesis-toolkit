@@ -5,9 +5,9 @@ from iam_ondb._utils import InvalidXmlFileError, ObjectDoesNotExistError
 
 from iam_ondb._line_strokes import extract_strokes, stroke_sets_iterator
 from iam_ondb._transcriptions import extract_transcription, transcriptions_iterator, \
-    lines_iterator
+    lines_iterator, MissingTranscriptionError, extract_transcription_from_txt_file
 from iam_ondb._utils import file_iterator, file_stem_iterator, get_logger
-from iam_ondb._utils import PathFinder, TranscriptionFinder
+from iam_ondb._utils import PathFinder, TranscriptionFinder, AsciiFileFinder
 from iam_ondb._validation import validate_dataset
 from iam_ondb._line_images import get_image_data, images_iterator
 from iam_ondb._writers import extract_writers
@@ -91,6 +91,7 @@ class IAMonDB:
         self.transcription_dir = os.path.join(db_path, 'original-xml-all', 'original')
         self.images_root = os.path.join(self._path, 'lineImages-all', 'lineImages')
         self.strokes_root = os.path.join(self._path, 'lineStrokes-all', 'lineStrokes')
+        self.ascii_dir = os.path.join(self._path, 'ascii-all', 'ascii')
 
     def __iter__(self):
         """Iterate over all triplets of a form (stroke_set, image, line).
@@ -100,7 +101,8 @@ class IAMonDB:
 
         :returns: an iterator returning tuples of (StrokeSet, PIL.Image, str)
         """
-        for object_id in self.get_text_line_ids():
+
+        for object_id in self.get_stroke_set_ids():
             example = self._try_getting_example(object_id)
             if example is not None:
                 yield example
@@ -150,10 +152,19 @@ class IAMonDB:
         finder = TranscriptionFinder(self.transcription_dir)
         dir_path = finder.find_path(object_id)
 
-        for path in file_iterator(dir_path):
-            for line_id, line in extract_transcription(path):
-                if line_id == object_id:
-                    return line
+        try:
+            for path in file_iterator(dir_path):
+                for line_id, line in extract_transcription(path):
+                    if line_id == object_id:
+                        return line
+        except MissingTranscriptionError:
+            pass
+
+        finder = AsciiFileFinder(self.ascii_dir)
+        path = finder.find_path(object_id)
+        for line_id, line in extract_transcription_from_txt_file(path):
+            if line_id == object_id:
+                return line
 
         self._raise_object_not_found(object_id)
 
