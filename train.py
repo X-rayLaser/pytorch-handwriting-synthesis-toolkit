@@ -83,7 +83,7 @@ def train_unconditional_handwriting_generator(train_set, val_set, device, config
 
     cb = handwriting_synthesis.callbacks.HandwritingGenerationCallback(
         model, config.samples_dir, config.max_length,
-        train_set, iteration_interval=config.sampling_interval
+        val_set, iteration_interval=config.sampling_interval
     )
 
     train_model(train_set, val_set, train_task, [cb], config,
@@ -123,7 +123,7 @@ def train_handwriting_synthesis_model(train_set, val_set, device, config):
         tokenizer,
         10,
         model, config.samples_dir, config.max_length,
-        train_set, iteration_interval=config.sampling_interval
+        val_set, iteration_interval=config.sampling_interval
     )
 
     train_model(train_set, val_set, train_task, [cb], config,
