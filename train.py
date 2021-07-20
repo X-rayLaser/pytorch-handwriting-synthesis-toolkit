@@ -91,17 +91,22 @@ def train_unconditional_handwriting_generator(train_set, val_set, device, config
 
 
 def train_handwriting_synthesis_model(train_set, val_set, device, config):
-    tokenizer = data.Tokenizer.from_file(config.charset_path)
-
-    alphabet_size = tokenizer.size
-
     synthesizer, epochs = HandwritingSynthesizer.load_latest(config.model_path, device)
 
     if synthesizer:
         model = synthesizer.model
     else:
+        tokenizer = data.Tokenizer.from_file(config.charset_path)
+        alphabet_size = tokenizer.size
+
         model = models.SynthesisNetwork.get_default_model(alphabet_size, device)
         model = model.to(device)
+
+        mu = torch.tensor(train_set.mu, dtype=torch.float32)
+        sd = torch.tensor(train_set.std, dtype=torch.float32)
+        synthesizer = HandwritingSynthesizer(
+            model, mu, sd, tokenizer.charset, num_steps=config.max_length
+        )
 
     if config.output_clip_value == 0 or config.lstm_clip_value == 0:
         clip_values = None
@@ -109,18 +114,11 @@ def train_handwriting_synthesis_model(train_set, val_set, device, config):
         clip_values = (config.output_clip_value, config.lstm_clip_value)
 
     train_task = handwriting_synthesis.tasks.HandwritingSynthesisTask(
-        tokenizer, device, model, clip_values
+        synthesizer.tokenizer, device, model, clip_values
     )
 
-    if not synthesizer:
-        mu = torch.tensor(train_set.mu, dtype=torch.float32)
-        sd = torch.tensor(train_set.std, dtype=torch.float32)
-        synthesizer = HandwritingSynthesizer(
-            model, mu, sd, tokenizer.charset, num_steps=config.max_length
-        )
-
     cb = handwriting_synthesis.callbacks.HandwritingSynthesisCallback(
-        tokenizer,
+        synthesizer.tokenizer,
         10,
         model, config.samples_dir, config.max_length,
         val_set, iteration_interval=config.sampling_interval
@@ -146,7 +144,9 @@ def get_device():
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description='Starts/resumes training prediction or synthesis network.'
+    )
 
     parser.add_argument("data_dir", type=str, help="Directory containing training and validation data h5 files")
     parser.add_argument("model_dir", type=str, help="Directory storing model weights")

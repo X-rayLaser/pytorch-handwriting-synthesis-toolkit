@@ -208,7 +208,6 @@ handwritings which all will be stored in a specified directory
 (by default, it will store them in "samples" directory). If a directory does not exist yet, it will be created.
 
 The following arguments are required:
-- a path to the prepared dataset folder
 - a path to the model checkpoint
 - a text to be converted to the handwriting.
 
@@ -216,27 +215,16 @@ For example, let's run the script to synthesize 5 samples of handwritten text fo
 Assuming that we prepared the data in a folder "data" and that we saved our model under
 "checkpoints/model_at_epoch_60.pt", we can run it this way:
 ```
-python synthesize.py data checkpoints/model_at_epoch_60.pt "A handwriting sample " --trials 5
+python synthesize.py checkpoints/Epoch_60 "A handwriting sample " --trials 5
 ```
 
 You can also use this script to visualize the attention weights predicted by the model at evey predicted point.
 This can be helpful for debugging reasons as it can tell whether your model learned to pay attention to the
 relevant parts of text string when generating points. To do that, you need to pass a flag --show_weights:
 ```
-python synthesize.py data checkpoints/model_at_epoch_60.pt "A handwriting sample " --trials 5 --show_weights 
+python synthesize.py checkpoints/Epoch_60 "A handwriting sample " --trials 5 --show_weights 
 ```
 
-*Important note. This script assumes that your network was trained using a default character set stored under
-<your prepared dataset folder>/charset.txt. However, if it is not the case, you need to pass another optional
-argument, --charset (or just -c). This will make sure that the script will correctly tokenize the text using the same
-character mapping that was used during the training.* 
-
-You might ask why the script needs a path to the dataset folder. The reason for that is that 
-the dataset folder contains normalization
-parameters (mean and standard deviation) used during the training to normalize examples.
-We trained the synthesis network to predict next normalized offset of the point given the previous offsets.
-To convert these normalized offsets into actual coordinates, we need to reverse the preprocessing and normalization
-steps.
 
 ## Biased sampling
 You can control the tradeoff between diversity and quality of produced
@@ -248,24 +236,25 @@ By default, bias equals to 0 which corresponds to unbiased sampling.
 
 # Sampling from a prediction network (unconditional)
 To sample from a prediction network, you can use sample.py script.
-It expects 3 required arguments: path to prepared dataset, path to pretrained
+It expects 2 required arguments: path to pretrained
 prediction network and path to directory that will store generated samples.
 
 Run the command below to generate 1 handwriting and save it to samples_dir folder.
 ```
-python sample.py data checkpoints/model_at_epoch_2.pt samples_dir
+python sample.py checkpoints/Epoch_2 samples_dir
 ```
 
 # Commands
 
 ## prepare_data.py
-Extract (optionally split), preprocess and save data in specified destination folder.
-
 ```
 $ python prepare_data.py --help
 usage: prepare_data.py [-h] [-l MAX_LEN]
                        save_dir provider_name
                        [provider_args [provider_args ...]]
+
+Extracts (optionally splits), preprocesses and saves data in specified
+destination folder.
 
 positional arguments:
   save_dir              Directory to save training and validation datasets
@@ -282,15 +271,14 @@ optional arguments:
 ```
 
 ## train.py
-
-Start/resume training prediction or synthesis network.
-
 ```
 $ python train.py --help
 usage: train.py [-h] [-u] [-b BATCH_SIZE] [-e EPOCHS] [-i INTERVAL]
                 [-c CHARSET] [--samples_dir SAMPLES_DIR] [--clip1 CLIP1]
                 [--clip2 CLIP2]
                 data_dir model_dir
+
+Starts/resumes training prediction or synthesis network.
 
 positional arguments:
   data_dir              Directory containing training and validation data h5
@@ -318,31 +306,30 @@ optional arguments:
 ```
 
 ## evaluate.py
-Compute loss and other metrics of trained network on validation set.
 ```
 $ python evaluate.py --help
-usage: evaluate.py [-h] [-c CHARSET] [-u] data_dir path
+usage: evaluate.py [-h] [-u] data_dir path
+
+Computes a loss and other metrics of trained network on validation set.
 
 positional arguments:
-  data_dir              Path to prepared dataset directory
-  path                  Path to saved model
+  data_dir             Path to prepared dataset directory
+  path                 Path to a saved model
 
 optional arguments:
-  -h, --help            show this help message and exit
-  -c CHARSET, --charset CHARSET
-                        Path to the charset file
-  -u, --unconditional   Whether or not the model is unconditional
+  -h, --help           show this help message and exit
+  -u, --unconditional  Whether or not the model is unconditional (assumes
+                       conditional model by default)
 ```
 
 ## sample.py
-Generate (unconditionally) samples from pretrained prediction network.
 ```
 $ python sample.py --help
-usage: sample.py [-h] [-b BIAS] [-s STEPS] [-t TRIALS]
-                 data_dir path sample_dir
+usage: sample.py [-h] [-b BIAS] [-s STEPS] [-t TRIALS] path sample_dir
+
+Generates (unconditionally) samples from a pretrained prediction network.
 
 positional arguments:
-  data_dir              Path to prepared dataset directory
   path                  Path to saved model
   sample_dir            Path to directory that will contain generated samples
 
@@ -357,15 +344,15 @@ optional arguments:
 ```
 
 ## synthesize.py
-Generate a handwriting(s) for a given string of text.
 ```
 $ python synthesize.py --help
 usage: synthesize.py [-h] [-b BIAS] [--trials TRIALS] [--show_weights]
-                     [--heatmap] [-c CHARSET] [--samples_dir SAMPLES_DIR]
-                     data_dir model_path text
+                     [--heatmap] [--samples_dir SAMPLES_DIR]
+                     model_path text
+
+Converts a single line of text into a handwriting with a randomly chosen style
 
 positional arguments:
-  data_dir              Path to prepared dataset directory
   model_path            Path to saved model
   text                  Text to be converted to handwriting
 
@@ -378,10 +365,31 @@ optional arguments:
                         attention weights
   --heatmap             When set, will produce a heatmap for mixture density
                         outputs
-  -c CHARSET, --charset CHARSET
-                        Path to the charset file
   --samples_dir SAMPLES_DIR
                         Path to the directory that will store samples
+```
+
+## txt2script.py
+```
+$ python txt2script.py --help
+usage: txt2script.py [-h] [-b BIAS] [--output_path OUTPUT_PATH]
+                     model_path input_path
+
+Converts a text file into a handwriting page.
+
+positional arguments:
+  model_path            Path to saved model
+  input_path            A path to a text file that needs to be converted to a
+                        handwriting
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -b BIAS, --bias BIAS  A probability bias. Unbiased sampling is performed by
+                        default.
+  --output_path OUTPUT_PATH
+                        Path to the generated handwriting file (by default, it
+                        will be saved to the current working directory whose
+                        name will be input_path with trailing .png extension)
 ```
 
 

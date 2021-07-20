@@ -5,7 +5,9 @@ from handwriting_synthesis.sampling import UnconditionalSampler
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description='Generates (unconditionally) samples from a pretrained prediction network.'
+    )
     parser.add_argument("path", type=str, help="Path to saved model")
     parser.add_argument("sample_dir", type=str, help="Path to directory that will contain generated samples")
     parser.add_argument(

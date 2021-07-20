@@ -10,7 +10,9 @@ def calculate_max_length(provider_class, *args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description='Extracts (optionally splits), preprocesses and saves data in specified destination folder.'
+    )
     parser.add_argument("save_dir", type=str, help="Directory to save training and validation datasets")
     parser.add_argument("provider_name", type=str, help="A short name used to lookup the corresponding factory class")
     parser.add_argument(
