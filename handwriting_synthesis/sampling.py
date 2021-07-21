@@ -29,9 +29,13 @@ class UnconditionalSampler:
         model = model.to(device)
 
         # todo: verify this would work for GPU device as well
-        if device.type == 'cpu':
-            model.load_state_dict(torch.load(model_path, map_location=device))
 
+        if device.type == 'cpu':
+            state_dict = torch.load(model_path, map_location=device)
+        else:
+            state_dict = torch.load(model_path)
+
+        model.load_state_dict(state_dict)
         return cls(model, mu, sd, charset, num_steps=1500)
 
     @classmethod
