@@ -228,7 +228,7 @@ def plot_attention_weights(phi, seq, save_path='img.png', text=''):
         temperatures = phi[i]
         colors = [str(t / temperatures.sum()) for t in temperatures]
 
-        axes[0].scatter([single_x] * len(temperatures), y_ticks, c=colors, s=20, cmap='gray')
+        axes[0].scatter([single_x] * len(temperatures), y_ticks, c=colors, s=5, cmap='gray')
 
     c = (1, 0, 0, 1)
     lc = mc.LineCollection(strokes, colors=c, linewidths=2)
@@ -510,7 +510,7 @@ def split_into_lines(text):
     for i, word in enumerate(words):
         line_words.append(word.strip().replace('\n', ''))
         if (i + 1) % 5 == 0:
-            line = ' '.join(line_words) + sentinel
+            line = ' '.join(line_words) + sentinel + sentinel
             lines.append(line)
             line_words = []
 

@@ -22,7 +22,64 @@ After cloning this repository, install its python dependencies:
 pip install -r requirements.txt
 ```
 
-# Prerequisites
+# Handwriting synthesis using pre-trained synthesis network
+
+Create 5 handwriting samples and save them in the "samples" directory 
+(If a directory does not exist yet, it will be created)
+```
+python synthesize.py checkpoints/Epoch_60 'A single string of text  ' -b 1 --samples_dir=samples
+```
+
+![image](results/conditional/other/biased_handwriting_line.png)
+
+The parameter sets a tradeoff between
+quality of samples and diversity (higher values tend to produce better looking samples).
+
+Optional parameter -b specifies a probability bias. 
+Higher values result in a cleaner, nicer looking handwriting,
+while lower values result in less readable but more diverse samples.
+Please, read a corresponding section in the paper for more detail.
+
+By default, bias equals to 0 which corresponds to unbiased sampling. 
+Just omit the bias parameter to do so:
+```
+python synthesize.py checkpoints/Epoch_60 'A single string of text  ' --samples_dir=samples
+```
+
+![image](results/conditional/other/unbiased_handwriting_line.png)
+
+Pass parameter --show_weights to create an attention heatmap
+```
+python synthesize.py checkpoints/Epoch_60 'A single string of text  ' -b 1 --samples_dir=samples --show_weights
+```
+
+![image](results/conditional/other/attention_weights.png)
+
+Pass parameter --heatmap to create a heatmap of predicted mixture densities
+```
+python synthesize.py checkpoints/Epoch_60 'A string of text  ' -b 1 --samples_dir=samples --heatmap
+```
+
+![image](results/conditional/other/heatmap.png)
+
+
+Generate a handwriting page for a text file
+```
+python txt2script.py checkpoints/Epoch_60 test_document.txt -b 1 --output_path 'handwriting_page.png'
+```
+
+![image](results/conditional/other/handwriting_page.png)
+
+# Unconditional sampling using pre-trained prediction network
+```
+python sample.py ucheckpoints/Epoch_36 usamples --trials 5 -b 0.5
+```
+![image](results/unconditional/biased_one_half.png)
+
+
+# Training from scratch
+
+## Prerequisites
 
 In order to carry out the experiments from the paper, you will need to download 
 the IAM On-Line Handwriting Database (or shortly, IAM-OnDB).
@@ -47,7 +104,7 @@ Download the data set and unzip it into iam_ondb_home folder. The layout of the 
     └── original
 ```
 
-# Quickstart
+## Quickstart
 
 Extract data examples from IAM-onDB dataset, preprocess it and save it into "data" directory:
 ```
@@ -75,7 +132,7 @@ python synthesize.py data checkpoints/model_at_epoch_50.pt 'Text to be converted
 This section very briefly describes steps needed to train (conditional) synthesis network.
 For more details, see dedicated sections below.
 
-# Data preparation
+## Data preparation
 The toolkit already comes with a built-in data preparation utility. 
 However, it requires a so-called data provider. If you want to use the IAM-onDB dataset, 
 no further action is necessary. Otherwise, you have to write your own to let the toolkit 
@@ -109,7 +166,7 @@ Any handwriting longer than max_len is going to be truncated to max_len points.
 
 For more details on the command usage, see the Commands section.
 
-# Implementing custom data provider
+## Implementing custom data provider
 
 The data provider is a class with a class attribute "name" and two methods: 
 get_training_data and get_validation_data.
@@ -175,7 +232,7 @@ python prepare_data.py temp_data dummy
 You should see a directory temp_data containing HDF5 files and one text file 
 with the text "Hi".
 
-# Training
+## Training
 
 After preparing the data, running "train.py" script will start or
 resume training a network.
@@ -199,50 +256,6 @@ This file contains all characters that were found by scanning the text part of t
 This might include digits, punctuation as well as other non-letter characters.
 You might want to restrict the set to contain only white-space and letters. Just create a new text file and
 populate it with characters that you want your synthesis network to be able to produce.
-
-# Sampling from Handwriting synthesis network
-
-Once you have a trained synthesis model, you can use it to convert a plain text into a handwritten one.
-This can be done with *synthesize.py* script. The script will take a text and generate a specified number of
-handwritings which all will be stored in a specified directory 
-(by default, it will store them in "samples" directory). If a directory does not exist yet, it will be created.
-
-The following arguments are required:
-- a path to the model checkpoint
-- a text to be converted to the handwriting.
-
-For example, let's run the script to synthesize 5 samples of handwritten text for a text "A handwriting sample ".
-Assuming that we prepared the data in a folder "data" and that we saved our model under
-"checkpoints/model_at_epoch_60.pt", we can run it this way:
-```
-python synthesize.py checkpoints/Epoch_60 "A handwriting sample " --trials 5
-```
-
-You can also use this script to visualize the attention weights predicted by the model at evey predicted point.
-This can be helpful for debugging reasons as it can tell whether your model learned to pay attention to the
-relevant parts of text string when generating points. To do that, you need to pass a flag --show_weights:
-```
-python synthesize.py checkpoints/Epoch_60 "A handwriting sample " --trials 5 --show_weights 
-```
-
-
-## Biased sampling
-You can control the tradeoff between diversity and quality of produced
-samples by passing optional parameter -b (or --bias).
-Higher values result in a cleaner, nicer looking hand writings,
-while lower values result in less readable but more diverse samples.
-
-By default, bias equals to 0 which corresponds to unbiased sampling.
-
-# Sampling from a prediction network (unconditional)
-To sample from a prediction network, you can use sample.py script.
-It expects 2 required arguments: path to pretrained
-prediction network and path to directory that will store generated samples.
-
-Run the command below to generate 1 handwriting and save it to samples_dir folder.
-```
-python sample.py checkpoints/Epoch_2 samples_dir
-```
 
 # Commands
 
