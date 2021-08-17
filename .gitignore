@@ -1,7 +1,5 @@
 venv/
 datasets/
-checkpoints/
-ucheckpoints/
 \.idea/
 *.pyc
 *.png
@@ -11,5 +9,4 @@ ucheckpoints/
 *.h5
 charset.txt
 test_document.txt
-*.pt
 !/results/**/*.png

@@ -27,7 +27,7 @@ pip install -r requirements.txt
 Create 5 handwriting samples and save them in the "samples" directory 
 (If a directory does not exist yet, it will be created)
 ```
-python synthesize.py checkpoints/Epoch_60 'A single string of text  ' -b 1 --samples_dir=samples
+python synthesize.py checkpoints/Epoch_46 'A single string of text  ' -b 1 --samples_dir=samples --trials=5
 ```
 
 ![image](results/conditional/other/biased_handwriting_line.png)
@@ -43,21 +43,21 @@ Please, read a corresponding section in the paper for more detail.
 By default, bias equals to 0 which corresponds to unbiased sampling. 
 Just omit the bias parameter to do so:
 ```
-python synthesize.py checkpoints/Epoch_60 'A single string of text  ' --samples_dir=samples
+python synthesize.py checkpoints/Epoch_56 'A single string of text  ' --samples_dir=samples
 ```
 
 ![image](results/conditional/other/unbiased_handwriting_line.png)
 
 Pass parameter --show_weights to create an attention heatmap
 ```
-python synthesize.py checkpoints/Epoch_60 'A single string of text  ' -b 1 --samples_dir=samples --show_weights
+python synthesize.py checkpoints/Epoch_52 'A single string of text  ' -b 1 --samples_dir=samples --show_weights
 ```
 
 ![image](results/conditional/other/attention_weights.png)
 
 Pass parameter --heatmap to create a heatmap of predicted mixture densities
 ```
-python synthesize.py checkpoints/Epoch_60 'A string of text  ' -b 1 --samples_dir=samples --heatmap
+python synthesize.py checkpoints/Epoch_52 'A string of text  ' -b 0.5 --samples_dir=samples --heatmap
 ```
 
 ![image](results/conditional/other/heatmap.png)
@@ -65,7 +65,7 @@ python synthesize.py checkpoints/Epoch_60 'A string of text  ' -b 1 --samples_di
 
 Generate a handwriting page for a text file
 ```
-python txt2script.py checkpoints/Epoch_60 test_document.txt -b 1 --output_path 'handwriting_page.png'
+python txt2script.py checkpoints/Epoch_52 test_document.txt -b 1 --output_path 'handwriting_page.png'
 ```
 
 ![image](results/conditional/other/handwriting_page.png)
