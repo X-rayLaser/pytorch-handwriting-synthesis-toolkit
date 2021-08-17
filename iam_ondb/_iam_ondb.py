@@ -92,6 +92,9 @@ class IAMonDB:
         self.images_root = os.path.join(self._path, 'lineImages-all', 'lineImages')
         self.strokes_root = os.path.join(self._path, 'lineStrokes-all', 'lineStrokes')
         self.ascii_dir = os.path.join(self._path, 'ascii-all', 'ascii')
+        self.xml_part_dir = os.path.join(self._path, 'original-xml-part', 'original')
+
+        self._stroke_set_ids = None
 
     def __iter__(self):
         """Iterate over all triplets of a form (stroke_set, image, line).
@@ -165,6 +168,18 @@ class IAMonDB:
         for line_id, line in extract_transcription_from_txt_file(path):
             if line_id == object_id:
                 return line
+
+        self._raise_object_not_found(object_id)
+
+    def get_transcription_object_by_id(self, object_id):
+        finder = TranscriptionFinder(self.transcription_dir)
+        dir_path = finder.find_path(object_id)
+
+        for path in file_iterator(dir_path):
+            transcription = extract_transcription(path)
+            for line_id, line in transcription:
+                if line_id == object_id:
+                    return transcription
 
         self._raise_object_not_found(object_id)
 
@@ -281,6 +296,36 @@ class IAMonDB:
                 return writer
 
         self._raise_object_not_found(writer_id)
+
+    def get_example_ids_for_writer(self, writer_id):
+        # todo: speed this up, add caching
+        if not self._stroke_set_ids:
+            self._stroke_set_ids = self.get_stroke_set_ids()
+
+        for i, object_id in enumerate(self._stroke_set_ids):
+            if i % 500 == 0:
+                print(f'processed {i} object ids')
+            try:
+                transcription = self.get_transcription_object_by_id(object_id)
+                form = transcription.General.Form
+                if not form:
+                    print(f'No form data! {object_id}')
+                elif form.writerID == writer_id:
+                    yield object_id
+            except MissingTranscriptionError:
+                print(f'Missing transcription for id {object_id}')
+            except ObjectDoesNotExistError:
+                print(f'Object with such id was not found: {object_id}')
+
+    def get_first_example_for_writer(self, writer_id):
+        gen = self.get_example_ids_for_writer(writer_id)
+        object_id = next(gen)
+        return self._try_getting_example(object_id)
+
+    def get_all_styles(self):
+        pass
+        # todo: extract 1 handwriting for every writer
+        # todo: save them in a styles folder
 
     def _raise_object_not_found(self, object_id):
         raise ObjectDoesNotExistError(

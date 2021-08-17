@@ -1,7 +1,7 @@
-Pillow
-numpy
-torch
-matplotlib
-torchvision
-requests
-h5py
+Pillow==8.2.0
+numpy==1.19.5
+torch==1.8.1
+matplotlib==3.3.4
+torchvision==0.9.1
+requests==2.25.1
+h5py==3.1.0
