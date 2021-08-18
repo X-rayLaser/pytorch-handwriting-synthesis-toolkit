@@ -8,5 +8,4 @@ datasets/
 *.zip
 *.h5
 charset.txt
-test_document.txt
 !/results/**/*.png

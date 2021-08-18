@@ -1,0 +1,5 @@
+This is a text file used as input to the handwriting generation command.
+ The command will split the text into lines.
+ Then it will generate handwriting images for every line and concatenate them into a single image.
+ Finally, the image will be saved in a specified path.
+ Consistent style across the whole page is achieved by priming the network with the handwriting of the first line.
