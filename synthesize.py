@@ -42,6 +42,7 @@ if __name__ == '__main__':
 
     synthesizer = HandwritingSynthesizer.load(args.model_path, device, args.bias)
     output_dir = args.samples_dir
+    os.makedirs(output_dir, exist_ok=True)
 
     base_file_name = re.sub('[^0-9a-zA-Z]+', '_', args.text)
 
