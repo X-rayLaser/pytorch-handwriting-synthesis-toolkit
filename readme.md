@@ -2,8 +2,8 @@
 
 # Introduction
 
-This toolkit contains utilities used to replicate some of the experiments described in Alex Graves's paper 
-Generating Sequences With Recurrent Neural Networks. Concretely, this repository focuses on handwriting 
+This toolkit contains utilities used to replicate some experiments described in Alex Graves's paper 
+[Generating Sequences With Recurrent Neural Networks](https://arxiv.org/abs/1308.0850). Concretely, this repository focuses on handwriting 
 prediction and handwriting synthesis sections.
 
 The repository includes almost everything that one might need for running the experiments. 
@@ -12,7 +12,7 @@ One only needs to provide the dataset. Scripts will take of everything else, inc
 
 The implementation closely follows the paper, from model architectures to training setup. 
 However, it also provides some customization (such as choosing the batch size, 
-the maximum length of the sequences, etc.)
+the maximum length of the sequences, etc.).
 In addition, the code can work with a custom dataset.
 
 # Installation
@@ -31,9 +31,6 @@ python synthesize.py checkpoints/Epoch_46 'A single string of text  ' -b 1 --sam
 ```
 
 ![image](results/conditional/other/biased_handwriting_line.png)
-
-The parameter sets a tradeoff between
-quality of samples and diversity (higher values tend to produce better looking samples).
 
 Optional parameter -b specifies a probability bias. 
 Higher values result in a cleaner, nicer looking handwriting,
@@ -106,7 +103,8 @@ Download the data set and unzip it into iam_ondb_home folder. The layout of the 
 
 ## Quickstart
 
-Extract data examples from IAM-onDB dataset, preprocess it and save it into "data" directory:
+Extract data examples from IAM-onDB dataset, preprocess it and save it into "data" directory
+(make sure that iam_ondb_home folder is located at the root of the repository):
 ```
 python prepare_data.py data iam 9500 0 iam_ondb_home -l 700
 ```
