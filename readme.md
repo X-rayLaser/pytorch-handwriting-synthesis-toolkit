@@ -15,6 +15,8 @@ However, it also provides some customization (such as choosing the batch size,
 the maximum length of the sequences, etc.).
 In addition, the code can work with a custom dataset.
 
+Pre-trained models for synthesis and prediction are stored, respectively, under checkpoints/ and ucheckpoints/ directories.
+
 # Installation
 
 After cloning this repository, install its python dependencies:
