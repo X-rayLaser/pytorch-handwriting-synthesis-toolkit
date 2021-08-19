@@ -11,6 +11,13 @@ from torch.utils.data import DataLoader
 from . import data
 from .metrics import MovingAverage
 from .losses import BiVariateGaussian
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+error_handler = logging.FileHandler(filename='errors.log')
+error_handler.setLevel(logging.ERROR)
+logger.addHandler(error_handler)
 
 
 class PaddedSequencesBatch:
@@ -473,7 +480,7 @@ class HandwritingSynthesizer:
                 sampled_handwriting = sampled_handwriting * self.sd + self.mu
                 visualize_strokes(sampled_handwriting, output_path, lines=True)
         except Exception:
-            traceback.print_exc()
+            logger.exception('Error when synthesizing a handwriting:')
 
 
 def text_to_script(synthesizer, text, save_path):

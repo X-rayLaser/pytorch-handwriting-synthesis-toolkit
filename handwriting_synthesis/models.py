@@ -7,6 +7,13 @@ from typing import List, Tuple
 from torch import Tensor
 import math
 from torch.nn import functional as F
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+error_handler = logging.FileHandler(filename='errors.log')
+error_handler.setLevel(logging.ERROR)
+logger.addHandler(error_handler)
 
 
 class PeepholeLSTM(jit.ScriptModule):
@@ -429,7 +436,7 @@ def get_mean_prediction(output, device, stochastic):
         try:
             x, y = sample_from_bivariate_mixture(mu1, mu2, sd1, sd2, component_ro)
         except Exception:
-            traceback.print_exc()
+            logger.exception('Failed to sample from bi-variate normal distribution:')
 
     if eos > 0.5:
         eos_flag = 1

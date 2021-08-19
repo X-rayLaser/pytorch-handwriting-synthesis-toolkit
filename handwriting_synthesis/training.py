@@ -5,6 +5,13 @@ from .metrics import MovingAverage
 from .tasks import TrainingTask
 from . import utils
 from .utils import collate, compute_validation_loss, compute_validation_metrics
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+error_handler = logging.FileHandler(filename='epochs_stats.log')
+error_handler.setLevel(logging.INFO)
+logger.addHandler(error_handler)
 
 
 class TrainingLoop:
@@ -64,6 +71,7 @@ class TrainingLoop:
 
             self._run_epoch_callbacks(epoch)
             self._output_device.write(f'\r{s}', end='\n')
+            logger.info(s)
 
     def _reset_metrics(self):
         for metric in self._train_metrics:

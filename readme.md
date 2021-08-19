@@ -6,9 +6,8 @@ This toolkit contains utilities used to replicate some experiments described in 
 [Generating Sequences With Recurrent Neural Networks](https://arxiv.org/abs/1308.0850). Concretely, this repository focuses on handwriting 
 prediction and handwriting synthesis sections.
 
-The repository includes almost everything that one might need for running the experiments. 
-It provides a complete working pipeline to take the dataset, train the model and generate samples. 
-One only needs to provide the dataset. Scripts will take of everything else, including data preprocessing and normalization.
+The repository provides a complete working pipeline to take the dataset, train the model and generate samples. 
+One only needs to provide the dataset. Scripts will take care of everything else, including data preprocessing and normalization.
 
 The implementation closely follows the paper, from model architectures to training setup. 
 However, it also provides some customization (such as choosing the batch size, 
