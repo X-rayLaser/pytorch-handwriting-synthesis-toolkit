@@ -13,7 +13,7 @@ class CanvasDrawer {
     this.marginX = marginX;
     this.marginY = marginY;
     this.context.clearRect(0, 0, canvas.width, canvas.height);
-    this.context.lineWidth = lineWidth || 10;
+    this.context.lineWidth = lineWidth || 30;
     this.context.beginPath();
   }
 
@@ -38,6 +38,25 @@ class CanvasDrawer {
 
   finish() {
     this.context.stroke();
+  }
+}
+
+
+class VirtualSurface {
+  //the idea is to scale down all coordinates and then calculate the canvas size which will be smaller
+  //thus performance should go up
+  constructor(scaleFactor) {
+    this.points = [];
+    this.scale = scaleFactor;
+  }
+  
+  push(points) {
+    this.points.push(...points);
+  }
+
+  calculateGeometry() {
+    let points = this.points.map(p => p / this.scale);
+    calculateGeometry(points);
   }
 }
 
@@ -81,7 +100,7 @@ class HandwritingScreen extends React.Component {
       done: true,
       bias: 0.5,
       canvasHeight: window.innerWidth / (defaultLogicalWidth / defaultLogicalHeight),
-      canvasWidth: '100%',
+      canvasWidth: defaultLogicalWidth,
       geometry: {
         x: 200,
         y: 200,
@@ -92,6 +111,9 @@ class HandwritingScreen extends React.Component {
 
     this.context = null;
     this.handleClick = this.handleClick.bind(this);
+    this.handleZoomIn = this.handleZoomIn.bind(this);
+    this.handleZoomOut = this.handleZoomOut.bind(this);
+    this.handleCancel = this.handleCancel.bind(this);
     this.handleChange = this.handleChange.bind(this);
     this.handleBiasChange = this.handleBiasChange.bind(this);
     this.adjustCanvasSize = this.adjustCanvasSize.bind(this);
@@ -104,7 +126,7 @@ class HandwritingScreen extends React.Component {
 
     this.setState({
       canvasHeight: window.innerWidth / (defaultLogicalWidth / defaultLogicalHeight),
-      canvasWidth: '100%',
+      canvasWidth: defaultLogicalWidth,
       geometry: {
         x: 200,
         y: 200,
@@ -138,22 +160,26 @@ class HandwritingScreen extends React.Component {
 
       if (e.data.event === "progressChanged") {
         this.setState((state, cb) => {
-          let newPoinst = [...state.points, ...e.data.results];
-          let newGeo = calculateGeometry(newPoinst);
+          let newPoints = [...state.points, ...e.data.results];
+          let newGeo = calculateGeometry(newPoints);
+          const maxWidth = 10000;
+          const maxHeight = 2000;
           newGeo.width = Math.max(window.innerWidth, state.geometry.width, newGeo.width);
-          newGeo.height = Math.max(window.innerHeight, newGeo.height);
+          newGeo.height = Math.max(window.innerHeight, state.geometry.height, newGeo.height);
+
+          newGeo.width = Math.min(newGeo.width, maxWidth);
+          newGeo.height = Math.min(newGeo.height, maxHeight);
 
           if (newGeo.width > state.geometry.width) {
-            newGeo.width = state.geometry.width + 400;
-            console.log(`Was ${state.geometry.width}, now ${newGeo.width}`);
-
+            const extraWidth = Math.round(state.geometry.width / 2);
+            newGeo.width = state.geometry.width + extraWidth;
           }
           return {
             geometry: newGeo,
-            canvasWidth: '100%',
+            canvasWidth: window.innerWidth,
             canvasHeight: window.innerWidth / (newGeo.width / newGeo.height),
             progress: e.data.value,
-            points: newPoinst
+            points: newPoints
           }
         });
         
@@ -171,18 +197,10 @@ class HandwritingScreen extends React.Component {
   }
 
   adjustCanvasSize() {
-    if (window.innerWidth < 600) {
-      let newWidth = window.innerWidth * 2;
       this.setState({
-        canvasWidth: `${newWidth}px`,
-        canvasHeight: newWidth / this.getAspectRatio()
-      });
-    } else {
-      this.setState({
-        canvasWidth: '100%',
+        canvasWidth: window.innerWidth,
         canvasHeight: window.innerWidth / this.getAspectRatio()
       });
-    }
   }
 
   updateCanvas() {
@@ -190,7 +208,10 @@ class HandwritingScreen extends React.Component {
 
     const marginX = this.state.geometry.minX;
     const marginY = this.state.geometry.minY;
-    const drawer = new CanvasDrawer(canvas, marginX, marginY);
+
+    const minWidth = 5;
+    const lineWidth = Math.floor(this.state.geometry.width / this.state.canvasWidth) + minWidth;
+    const drawer = new CanvasDrawer(canvas, marginX, marginY, lineWidth);
 
     drawer.draw(this.state.points);
     drawer.finish();
@@ -198,9 +219,33 @@ class HandwritingScreen extends React.Component {
 
   handleClick() {
     this.resetGeometry();
-    const canvas = this.canvasRef.current;
     this.setState({points: [], done: false});
     this.worker.startWorker(this.state.text, this.state.bias);
+  }
+
+  handleZoomIn() {
+    this.setState((state, cb) => ({
+      canvasWidth: state.canvasWidth * 2,
+      canvasHeight: state.canvasHeight * 2
+    }));
+  }
+
+  handleZoomOut() {
+    this.setState((state, cb) => ({
+      canvasWidth: Math.round(state.canvasWidth / 2),
+      canvasHeight: Math.round(state.canvasHeight / 2)
+    }));
+  }
+
+  handleCancel() {
+    if (this.worker) {
+      this.worker.terminate();
+      this.setState({
+        points: [],
+        done: true,
+        progress: 0
+      });
+    }
   }
 
   handleChange(e) {
@@ -228,9 +273,15 @@ class HandwritingScreen extends React.Component {
 
         {!this.state.done && <div>Generating a handwriting, please wait...</div>}
         {!this.state.done && <ProgressBar now={this.state.progress} />}
-        <div style={{overflow:'auto'}}>
+        {this.state.done && this.state.points.length > 0 &&
+        <div>
+          <Button onClick={this.handleZoomIn}>Zoom In</Button>
+          <Button onClick={this.handleZoomOut}>Zoom out</Button>
+        </div>
+        }
+        <div style={{ overflow: 'auto'}}>
           <canvas ref={this.canvasRef} width={this.state.geometry.width} height={this.state.geometry.height} 
-                  style={{ width: this.state.canvasWidth, height: `${this.state.canvasHeight}px`}} ></canvas>
+                  style={{ width: `${this.state.canvasWidth}px`, height: `${this.state.canvasHeight}px`}} ></canvas>
         </div>
       </div>
     );

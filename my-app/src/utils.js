@@ -116,7 +116,7 @@ export async function generateHandwriting(text, biasValue, onProgress) {
     let prevY = 0;
   
     const outputs = [];
-    const avgStepsPerLetter = 30;
+    const avgStepsPerLetter = 50;
     const steps = avgStepsPerLetter * text.length;
     const updateInterval = 1;
 
