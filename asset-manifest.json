@@ -1,27 +1,27 @@
 {
   "files": {
-    "main.css": "./static/css/main.a617e044.chunk.css",
-    "main.js": "./static/js/main.89f8a6e7.chunk.js",
-    "main.js.map": "./static/js/main.89f8a6e7.chunk.js.map",
-    "runtime-main.js": "./static/js/runtime-main.82f78c21.js",
-    "runtime-main.js.map": "./static/js/runtime-main.82f78c21.js.map",
-    "static/css/2.983f79de.chunk.css": "./static/css/2.983f79de.chunk.css",
-    "static/js/2.6edd4265.chunk.js": "./static/js/2.6edd4265.chunk.js",
-    "static/js/2.6edd4265.chunk.js.map": "./static/js/2.6edd4265.chunk.js.map",
-    "static/js/3.4ec14301.chunk.js": "./static/js/3.4ec14301.chunk.js",
-    "static/js/3.4ec14301.chunk.js.map": "./static/js/3.4ec14301.chunk.js.map",
-    "bc04f7c494fd6d878567.worker.js": "./bc04f7c494fd6d878567.worker.js",
-    "bc04f7c494fd6d878567.worker.js.map": "./bc04f7c494fd6d878567.worker.js.map",
-    "index.html": "./index.html",
-    "static/css/2.983f79de.chunk.css.map": "./static/css/2.983f79de.chunk.css.map",
-    "static/css/main.a617e044.chunk.css.map": "./static/css/main.a617e044.chunk.css.map",
-    "static/js/2.6edd4265.chunk.js.LICENSE.txt": "./static/js/2.6edd4265.chunk.js.LICENSE.txt"
+    "main.css": "/pytorch-handwriting-synthesis-toolkit/static/css/main.a617e044.chunk.css",
+    "main.js": "/pytorch-handwriting-synthesis-toolkit/static/js/main.1e26a65b.chunk.js",
+    "main.js.map": "/pytorch-handwriting-synthesis-toolkit/static/js/main.1e26a65b.chunk.js.map",
+    "runtime-main.js": "/pytorch-handwriting-synthesis-toolkit/static/js/runtime-main.abbac026.js",
+    "runtime-main.js.map": "/pytorch-handwriting-synthesis-toolkit/static/js/runtime-main.abbac026.js.map",
+    "static/css/2.983f79de.chunk.css": "/pytorch-handwriting-synthesis-toolkit/static/css/2.983f79de.chunk.css",
+    "static/js/2.6edd4265.chunk.js": "/pytorch-handwriting-synthesis-toolkit/static/js/2.6edd4265.chunk.js",
+    "static/js/2.6edd4265.chunk.js.map": "/pytorch-handwriting-synthesis-toolkit/static/js/2.6edd4265.chunk.js.map",
+    "static/js/3.4ec14301.chunk.js": "/pytorch-handwriting-synthesis-toolkit/static/js/3.4ec14301.chunk.js",
+    "static/js/3.4ec14301.chunk.js.map": "/pytorch-handwriting-synthesis-toolkit/static/js/3.4ec14301.chunk.js.map",
+    "d47adc4009754b8f31be.worker.js": "/pytorch-handwriting-synthesis-toolkit/d47adc4009754b8f31be.worker.js",
+    "d47adc4009754b8f31be.worker.js.map": "/pytorch-handwriting-synthesis-toolkit/d47adc4009754b8f31be.worker.js.map",
+    "index.html": "/pytorch-handwriting-synthesis-toolkit/index.html",
+    "static/css/2.983f79de.chunk.css.map": "/pytorch-handwriting-synthesis-toolkit/static/css/2.983f79de.chunk.css.map",
+    "static/css/main.a617e044.chunk.css.map": "/pytorch-handwriting-synthesis-toolkit/static/css/main.a617e044.chunk.css.map",
+    "static/js/2.6edd4265.chunk.js.LICENSE.txt": "/pytorch-handwriting-synthesis-toolkit/static/js/2.6edd4265.chunk.js.LICENSE.txt"
   },
   "entrypoints": [
-    "static/js/runtime-main.82f78c21.js",
+    "static/js/runtime-main.abbac026.js",
     "static/css/2.983f79de.chunk.css",
     "static/js/2.6edd4265.chunk.js",
     "static/css/main.a617e044.chunk.css",
-    "static/js/main.89f8a6e7.chunk.js"
+    "static/js/main.1e26a65b.chunk.js"
   ]
 }
