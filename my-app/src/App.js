@@ -218,6 +218,20 @@ class HandwritingScreen extends React.Component {
   }
 
   handleClick() {
+    if (this.state.bias < 0) {
+      window.alert("Negative bias is not allowed!");
+      return;
+    }
+
+    if (this.state.text.length < 6) {
+      window.alert("Text must contain at least 6 characters. Please, try again.");
+      return;
+    }
+
+    if (this.state.text.length >= 50) {
+      window.alert("Text must contain fewer thatn 50 characters. Please, try again.");
+      return;
+    }
     this.resetGeometry();
     this.setState({points: [], done: false});
     this.worker.startWorker(this.state.text, this.state.bias);
@@ -252,7 +266,14 @@ class HandwritingScreen extends React.Component {
     this.setState({text: e.target.value});
   }
   handleBiasChange(e) {
-    this.setState({bias: e.target.value});
+    try {
+      let value = parseFloat(e.target.value);
+      if (value >= 0) {
+        this.setState({bias: value});  
+      }
+    } catch (e) {
+      console.error(e);
+    }
   }
   render() {
     return (
@@ -291,7 +312,12 @@ class HandwritingScreen extends React.Component {
 
 function App() {
   return (
-    <HandwritingScreen />
+    <div>
+      <h4 style={{ textAlign: 'center'}}>This is a handwriting synthesis demo. It is a Javascript port of 
+        <a href="https://github.com/X-rayLaser/pytorch-handwriting-synthesis-toolkit"> pytorch-handwriting-synthesis-toolkit</a> repository.
+      </h4>
+      <HandwritingScreen />
+    </div>
   );
 }
 
