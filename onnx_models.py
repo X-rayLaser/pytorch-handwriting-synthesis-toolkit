@@ -160,7 +160,7 @@ class SynthesisNetwork(nn.Module):
         h1, c1 = hidden1
         h2, c2 = hidden2
         h3, c3 = hidden3
-        return pi, mu, sd, ro, eos, w, k, h1, c1, h2, c2, h3, c3
+        return pi, mu, sd, ro, eos, w, k, h1, c1, h2, c2, h3, c3, phi
 
     def compute_mixture(self, x: Tensor, h1: Tensor, w1: Tensor,
                         hidden2: Tuple[Tensor, Tensor], hidden3: Tuple[Tensor, Tensor], bias):
