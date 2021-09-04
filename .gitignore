@@ -9,3 +9,5 @@ datasets/
 *.h5
 charset.txt
 !/results/**/*.png
+my-app/public/
+my-app/package-lock.json
