@@ -8,9 +8,9 @@ import MultivariateNormal from "multivariate-normal";
 A hack to work around an issue with missing .wasm files when app is 
 deployed at Github Pages. onnxruntime-web tries fetching them relative to the / instead of
 [repository-name]/.
- */
-const oldFetch = fetch;
-fetch = function() {
+*/
+const oldFetch = self.fetch;
+self.fetch = function() {
   if (location.hostname === "localhost") {
     return oldFetch.apply(this, arguments);
   }
@@ -20,7 +20,7 @@ fetch = function() {
   if (oldUrl.endsWith("ort-wasm.wasm")) {
     arguments[0] = "https://x-raylaser.github.io/pytorch-handwriting-synthesis-toolkit/ort-wasm.wasm";
   }
-  console.log(arguments);
+  
   return oldFetch.apply(this, arguments);
 }
 
