@@ -7,21 +7,36 @@
   <body>
     <div id="root"></div>
     <script>
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js', { scope: '/' }).then(function(reg) {
+      var oldXHROpen = window.XMLHttpRequest.prototype.open;
+      /*
+      window.XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
+       if (url.endsWidth("ort-wasm.wasm")) {
+            url = "localhost:8080/crazy-one/"     
+        }
+        
+        // This should take care of the response but it is not working.
+        this.addEventListener('load', function() {
+            var original_response, modified_response;
 
-          if(reg.installing) {
-            console.log('Service worker installing');
-          } else if(reg.waiting) {
-            console.log('Service worker installed');
-          } else if(reg.active) {
-            console.log('Service worker active');
-          }
+            original_response = this.responseText;
+            Object.defineProperty(this, "responseText", {writable: true});
 
-        }).catch(function(error) {
-          // registration failed
-          console.log('Registration failed with ' + error);
-        });
+            modified_response = JSON.parse(original_response);
+            modified_response.htmlinfo = "woops! All data has gone!";
+            this.responseText = JSON.stringify(modified_response);
+       });
+       
+
+       return oldXHROpen.apply(this, method, url, async, user, password);
+      }
+      */
+      let constantMock = window.fetch;
+      window.fetch = function() {
+          console.log('Intercept')
+          console.log(arguments)
+          // Get the parameter in arguments
+          // Intercept the parameter here 
+          return constantMock.apply(this, arguments)
       }
     </script>
     <script src="main.js"></script>
