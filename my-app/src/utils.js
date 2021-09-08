@@ -1,6 +1,9 @@
-//const ort = require('onnxruntime-web');
+import "core-js/stable";
+import "regenerator-runtime/runtime";
+
+const ort = require('onnxruntime-web');
 import MultivariateNormal from "multivariate-normal";
-importScripts("https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js");
+//importScripts("pytorch-handwriting-synthesis-toolkit/ort.min.js");
 
 
 class Tokenizer {

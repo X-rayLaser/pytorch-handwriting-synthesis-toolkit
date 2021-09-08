@@ -3,7 +3,8 @@ import React from 'react';
 import Button from 'react-bootstrap/Button';
 import ProgressBar from 'react-bootstrap/ProgressBar';
 //const ort = require('onnxruntime-web');
-import worker from 'workerize-loader!./worker';// eslint-disable-line import/no-webpack-loader-syntax
+//import worker from 'workerize-loader!./worker';// eslint-disable-line import/no-webpack-loader-syntax
+import { generateHandwriting } from './utils';
 
 
 class CanvasDrawer {
@@ -86,6 +87,10 @@ function calculateGeometry(points) {
 }
 
 
+let worker = new Worker(new URL("./worker.js", import.meta.url));
+console.log(worker);
+
+
 class HandwritingScreen extends React.Component {
   constructor(props) {
     super(props);
@@ -117,7 +122,6 @@ class HandwritingScreen extends React.Component {
     this.handleChange = this.handleChange.bind(this);
     this.handleBiasChange = this.handleBiasChange.bind(this);
     this.adjustCanvasSize = this.adjustCanvasSize.bind(this);
-    this.worker = null;
   }
 
   resetGeometry() {
@@ -144,10 +148,9 @@ class HandwritingScreen extends React.Component {
     window.addEventListener('resize', this.adjustCanvasSize);
 
     this.context = this.canvasRef.current.getContext('2d');
-    this.worker = worker();
     
-    this.worker.addEventListener('message', e => {
-      
+    worker.addEventListener('message', e => {
+      console.log(e);
       if (e.data.event === "resultsReady") {
         
         this.setState({
@@ -194,6 +197,7 @@ class HandwritingScreen extends React.Component {
 
   componentWillUnmount() {
     window.removeEventListener('resize', this.adjustCanvasSize);
+    worker.removeEventListener('message');
   }
 
   adjustCanvasSize() {
@@ -234,7 +238,8 @@ class HandwritingScreen extends React.Component {
     }
     this.resetGeometry();
     this.setState({points: [], done: false});
-    this.worker.startWorker(this.state.text, this.state.bias);
+
+    worker.postMessage([this.state.text, this.state.bias]);
   }
 
   handleZoomIn() {
