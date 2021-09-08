@@ -6,39 +6,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      var oldXHROpen = window.XMLHttpRequest.prototype.open;
-      /*
-      window.XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
-       if (url.endsWidth("ort-wasm.wasm")) {
-            url = "localhost:8080/crazy-one/"     
-        }
-        
-        // This should take care of the response but it is not working.
-        this.addEventListener('load', function() {
-            var original_response, modified_response;
-
-            original_response = this.responseText;
-            Object.defineProperty(this, "responseText", {writable: true});
-
-            modified_response = JSON.parse(original_response);
-            modified_response.htmlinfo = "woops! All data has gone!";
-            this.responseText = JSON.stringify(modified_response);
-       });
-       
-
-       return oldXHROpen.apply(this, method, url, async, user, password);
-      }
-      */
-      let constantMock = window.fetch;
-      window.fetch = function() {
-          console.log('Intercept')
-          console.log(arguments)
-          // Get the parameter in arguments
-          // Intercept the parameter here 
-          return constantMock.apply(this, arguments)
-      }
-    </script>
     <script src="main.js"></script>
   </body>
 </html>

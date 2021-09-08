@@ -3,7 +3,26 @@ import "regenerator-runtime/runtime";
 
 const ort = require('onnxruntime-web');
 import MultivariateNormal from "multivariate-normal";
-//importScripts("pytorch-handwriting-synthesis-toolkit/ort.min.js");
+
+/*
+A hack to work around an issue with missing .wasm files when app is 
+deployed at Github Pages. onnxruntime-web tries fetching them relative to the / instead of
+[repository-name]/.
+ */
+const oldFetch = fetch;
+fetch = function() {
+  if (location.hostname === "localhost") {
+    return oldFetch.apply(this, arguments);
+  }
+
+  let oldUrl = arguments[0];
+
+  if (oldUrl.endsWith("ort-wasm.wasm")) {
+    arguments[0] = "https://x-raylaser.github.io/pytorch-handwriting-synthesis-toolkit/ort-wasm.wasm";
+  }
+  console.log(arguments);
+  return oldFetch.apply(this, arguments);
+}
 
 
 class Tokenizer {

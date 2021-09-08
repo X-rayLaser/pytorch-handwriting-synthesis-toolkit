@@ -2,9 +2,6 @@ import './App.css';
 import React from 'react';
 import Button from 'react-bootstrap/Button';
 import ProgressBar from 'react-bootstrap/ProgressBar';
-//const ort = require('onnxruntime-web');
-//import worker from 'workerize-loader!./worker';// eslint-disable-line import/no-webpack-loader-syntax
-import { generateHandwriting } from './utils';
 
 
 class CanvasDrawer {
@@ -150,7 +147,7 @@ class HandwritingScreen extends React.Component {
     this.context = this.canvasRef.current.getContext('2d');
     
     worker.addEventListener('message', e => {
-      console.log(e);
+
       if (e.data.event === "resultsReady") {
         
         this.setState({

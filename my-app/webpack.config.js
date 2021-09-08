@@ -13,7 +13,6 @@ module.exports = {
   },
   module: {
     rules: [
-        {"test": /\.csv/, "use": "csv-loader"},
         {
             test: /\.m?js$/,
             exclude: /(node_modules|bower_components)/,
@@ -27,7 +26,7 @@ module.exports = {
         },
         {
             test: /\.css/,
-            use: { loader: "css-loader" }
+            use: ['style-loader', 'css-loader']
         }
     ]
   },
@@ -40,5 +39,5 @@ module.exports = {
     patterns: [{ from: './*.onnx', to: '[name][ext]' }]
   })
 ],
-  mode: "development"
+  mode: "production"
 };
