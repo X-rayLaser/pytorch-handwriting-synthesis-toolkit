@@ -2,6 +2,9 @@ import './App.css';
 import React from 'react';
 import Button from 'react-bootstrap/Button';
 import ProgressBar from 'react-bootstrap/ProgressBar';
+import Container from 'react-bootstrap/Container';
+import Row from 'react-bootstrap/Row';
+import Col from 'react-bootstrap/Col';
 
 
 class CanvasDrawer {
@@ -100,8 +103,6 @@ class HandwritingScreen extends React.Component {
       text: "",
       done: true,
       bias: 0.5,
-      canvasHeight: window.innerWidth / (defaultLogicalWidth / defaultLogicalHeight),
-      canvasWidth: defaultLogicalWidth,
       geometry: {
         x: 200,
         y: 200,
@@ -126,8 +127,7 @@ class HandwritingScreen extends React.Component {
     let defaultLogicalHeight = 1000;
 
     this.setState({
-      canvasHeight: window.innerWidth / (defaultLogicalWidth / defaultLogicalHeight),
-      canvasWidth: defaultLogicalWidth,
+      scale: 1,
       geometry: {
         x: 200,
         y: 200,
@@ -178,8 +178,6 @@ class HandwritingScreen extends React.Component {
       }
       return {
         geometry: newGeo,
-        canvasWidth: window.innerWidth,
-        canvasHeight: window.innerWidth / (newGeo.width / newGeo.height),
         progress: e.data.value,
         points: newPoints
       }
@@ -206,10 +204,7 @@ class HandwritingScreen extends React.Component {
   }
 
   adjustCanvasSize() {
-      this.setState({
-        canvasWidth: window.innerWidth,
-        canvasHeight: window.innerWidth / this.getAspectRatio()
-      });
+    this.forceUpdate();
   }
 
   updateCanvas() {
@@ -219,7 +214,8 @@ class HandwritingScreen extends React.Component {
     const marginY = this.state.geometry.minY;
 
     const minWidth = 5;
-    const lineWidth = Math.floor(this.state.geometry.width / this.state.canvasWidth) + minWidth;
+    let canvasWidth = window.innerWidth * this.state.scale;
+    const lineWidth = Math.floor(this.state.geometry.width / canvasWidth) + minWidth;
     const drawer = new CanvasDrawer(canvas, marginX, marginY, lineWidth);
 
     drawer.draw(this.state.points);
@@ -248,17 +244,27 @@ class HandwritingScreen extends React.Component {
   }
 
   handleZoomIn() {
-    this.setState((state, cb) => ({
-      canvasWidth: state.canvasWidth * 2,
-      canvasHeight: state.canvasHeight * 2
-    }));
+    if (this.canZoomIn()) {
+      this.setState((state, cb) => ({scale: state.scale * 2}));
+    }
   }
 
   handleZoomOut() {
-    this.setState((state, cb) => ({
-      canvasWidth: Math.round(state.canvasWidth / 2),
-      canvasHeight: Math.round(state.canvasHeight / 2)
-    }));
+    if (this.canZoomOut()) {
+      this.setState((state, cb) => ({scale: state.scale / 2}));
+    }
+  }
+
+  canZoomIn() {
+    return this.state.scale < 10;
+  }
+
+  canZoomOut() {
+    return this.state.scale > 0.1;
+  }
+
+  isScaleWithinBounds() {
+    return this.state.scale > 0.1 && this.state.scale < 10;
   }
 
   handleCancel() {
@@ -286,33 +292,60 @@ class HandwritingScreen extends React.Component {
     }
   }
   render() {
+    let scaledWidth = window.innerWidth * this.state.scale;
+    let canvasHeight = Math.round(scaledWidth / this.getAspectRatio());
+    let canvasWidth = Math.round(scaledWidth);
+
     return (
       <div className="App">
-        <textarea placeholder="Enter text for a handwriting" value={this.state.text} onChange={this.handleChange}>
+        <Container>
+          <textarea className="mb-2" placeholder="Enter text to generate a handwriting for" 
+                    value={this.state.text} onChange={this.handleChange}>
 
-        </textarea>
-        <details>
-          <summary>Settings</summary>
-            <label>Bias</label>
-            <input type="number" value={this.state.bias} min={0} max={100} step={0.1} onChange={this.handleBiasChange} />
-        </details>
-        <div>
-          <Button onClick={this.handleClick} disabled={this.state.text.trim() === "" || !this.state.done}>
-            Generate
-          </Button>
-        </div>
+          </textarea>
+          <details className="mb-2">
+            <summary>Settings</summary>
+              <label>Bias</label>
+              <input type="number" value={this.state.bias} min={0} max={100} step={0.1} onChange={this.handleBiasChange} />
+          </details>
+          <Row className="mb-2">
+            <Col>
+              <Button onClick={this.handleClick} disabled={this.state.text.trim() === "" || !this.state.done}>
+                Generate handwriting
+              </Button>
+            </Col>
+          </Row>
 
-        {!this.state.done && <div>Generating a handwriting, please wait...</div>}
-        {!this.state.done && <ProgressBar now={this.state.progress} />}
-        {this.state.done && this.state.points.length > 0 &&
-        <div>
-          <Button onClick={this.handleZoomIn}>Zoom In</Button>
-          <Button onClick={this.handleZoomOut}>Zoom out</Button>
-        </div>
-        }
+          {!this.state.done && 
+            <Row>
+              <Col>
+                <Row>
+                  <Col>
+                    <h4>Generating a handwriting, please wait...</h4>
+                  </Col>
+                </Row>
+                <Row>
+                  <Col>
+                    <ProgressBar now={this.state.progress} />
+                  </Col>
+                </Row>
+              </Col>
+            </Row>
+          }
+          {this.state.done && this.state.points.length > 0 &&
+          <Row>
+            <Col>
+              <Button variant="secondary" onClick={this.handleZoomIn} disabled={!this.canZoomIn()}>
+                Zoom In
+              </Button>
+              <Button variant="secondary" onClick={this.handleZoomOut} disabled={!this.canZoomOut()}>Zoom out</Button>
+            </Col>
+          </Row>
+          }
+        </Container>
         <div style={{ overflow: 'auto'}}>
           <canvas ref={this.canvasRef} width={this.state.geometry.width} height={this.state.geometry.height} 
-                  style={{ width: `${this.state.canvasWidth}px`, height: `${this.state.canvasHeight}px`}} ></canvas>
+                  style={{ width: `${canvasWidth}px`, height: `${canvasHeight}px`}} ></canvas>
         </div>
       </div>
     );
@@ -323,9 +356,11 @@ class HandwritingScreen extends React.Component {
 function App() {
   return (
     <div>
-      <h4 style={{ textAlign: 'center'}}>This is a handwriting synthesis demo. It is a Javascript port of 
-        <a href="https://github.com/X-rayLaser/pytorch-handwriting-synthesis-toolkit"> pytorch-handwriting-synthesis-toolkit</a> repository.
-      </h4>
+      <Container>
+        <h4 style={{ textAlign: 'center'}}>This is a handwriting synthesis demo. It is a Javascript port of 
+          <a href="https://github.com/X-rayLaser/pytorch-handwriting-synthesis-toolkit"> pytorch-handwriting-synthesis-toolkit</a> repository.
+        </h4>
+      </Container>
       <HandwritingScreen />
     </div>
   );
