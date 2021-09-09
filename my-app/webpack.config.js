@@ -44,5 +44,5 @@ module.exports = {
       template: './src/index_template.html'
     })
   ],
-  mode: "development"
+  mode: "production"
 };
