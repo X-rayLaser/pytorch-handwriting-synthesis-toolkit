@@ -1,19 +1,28 @@
 import './App.css';
 import React from 'react';
 import Button from 'react-bootstrap/Button';
+import ButtonGroup from 'react-bootstrap/ButtonGroup';
 import ProgressBar from 'react-bootstrap/ProgressBar';
 import Container from 'react-bootstrap/Container';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
+import Form from 'react-bootstrap/Form';
+import Accordion from 'react-bootstrap/Accordion';
+import { SketchPicker } from 'react-color';
 
 
 class CanvasDrawer {
-  constructor(canvas, marginX, marginY, lineWidth) {
+  constructor(canvas, marginX, marginY, lineWidth, background, strokeColor) {
     this.wasEos = false;
     this.context = canvas.getContext('2d', { alpha: false});
     this.marginX = marginX;
     this.marginY = marginY;
     this.context.clearRect(0, 0, canvas.width, canvas.height);
+    this.context.fillStyle = background;
+    this.context.strokeStyle = strokeColor;
+    if (background !== '#fff') {
+      this.context.fillRect(0, 0, canvas.width, canvas.height);
+    }
     this.context.lineWidth = lineWidth || 30;
     this.context.beginPath();
   }
@@ -103,6 +112,9 @@ class HandwritingScreen extends React.Component {
       text: "",
       done: true,
       bias: 0.5,
+      showBackgroundPicker: false,
+      showStrokeColorPicker: false,
+      background: '#fff',
       geometry: {
         x: 200,
         y: 200,
@@ -117,6 +129,8 @@ class HandwritingScreen extends React.Component {
     this.handleZoomOut = this.handleZoomOut.bind(this);
     this.handleCancel = this.handleCancel.bind(this);
     this.handleChange = this.handleChange.bind(this);
+    this.handleChangeBackground = this.handleChangeBackground.bind(this);
+    this.handleChangeStrokeColor = this.handleChangeStrokeColor.bind(this);
     this.handleBiasChange = this.handleBiasChange.bind(this);
     this.adjustCanvasSize = this.adjustCanvasSize.bind(this);
     this.workerListener = null;
@@ -216,7 +230,9 @@ class HandwritingScreen extends React.Component {
     const minWidth = 5;
     let canvasWidth = window.innerWidth * this.state.scale;
     const lineWidth = Math.floor(this.state.geometry.width / canvasWidth) + minWidth;
-    const drawer = new CanvasDrawer(canvas, marginX, marginY, lineWidth);
+    const backgroundColor = this.state.background;
+    const strokeColor = this.state.strokeColor;
+    const drawer = new CanvasDrawer(canvas, marginX, marginY, lineWidth, backgroundColor, strokeColor);
 
     drawer.draw(this.state.points);
     drawer.finish();
@@ -284,12 +300,20 @@ class HandwritingScreen extends React.Component {
   handleBiasChange(e) {
     try {
       let value = parseFloat(e.target.value);
-      if (value >= 0) {
+      if (value >= 0 && value <= 10) {
         this.setState({bias: value});  
       }
     } catch (e) {
       console.error(e);
     }
+  }
+
+  handleChangeBackground(color) {
+    this.setState({background: color.hex});
+  }
+
+  handleChangeStrokeColor(color) {
+    this.setState({strokeColor: color.hex});
   }
   render() {
     let scaledWidth = window.innerWidth * this.state.scale;
@@ -303,11 +327,73 @@ class HandwritingScreen extends React.Component {
                     value={this.state.text} onChange={this.handleChange}>
 
           </textarea>
-          <details className="mb-2">
-            <summary>Settings</summary>
-              <label>Bias</label>
-              <input type="number" value={this.state.bias} min={0} max={100} step={0.1} onChange={this.handleBiasChange} />
-          </details>
+          <Accordion collapse className="mb-2">
+            <Accordion.Item eventKey="0">
+              <Accordion.Header>Settings</Accordion.Header>
+              <Accordion.Body>
+                <Form>
+                  <Row className="align-items-center mb-2">
+
+                    <Col xs="auto" style={{margin: 'auto'}}>
+                      <Form.Label htmlFor="inlineFormInput">
+                        Bias
+                      </Form.Label>
+                        <Form.Control type="number" id="inlineFormInput"
+                                      value={this.state.bias} min={0} max={100} step={0.1} 
+                                      onChange={this.handleBiasChange} />
+                      </Col>
+                  </Row>
+                  <Row className="mb-2">
+
+                  {!this.state.showBackgroundPicker &&
+                    <Col>
+                      <Button onClick={e => this.setState({showBackgroundPicker: true})}>
+                        Choose background color
+                      </Button>
+                    </Col>
+                  }
+                  {this.state.showBackgroundPicker &&
+                    <Col>
+                      <div style={{width: 'auto'}}>
+                        <SketchPicker
+                          style={{margin:'auto'}}
+                          color={ this.state.background }
+                          onChangeComplete={ this.handleChangeBackground }
+                        />
+                      </div>
+                      <Button onClick={e => this.setState({showBackgroundPicker: false})}>
+                        Close color picker
+                      </Button>
+                    </Col>
+                  }
+                  </Row>
+                  <Row>
+                    {!this.state.showStrokeColorPicker &&
+                      <Col>
+                        <Button onClick={e => this.setState({showStrokeColorPicker: true})}>
+                          Choose stroke color
+                        </Button>
+                      </Col>
+                    }
+                    {this.state.showStrokeColorPicker &&
+                      <Col>
+                        <div style={{width: 'auto'}}>
+                          <SketchPicker
+                            style={{margin:'auto'}}
+                            color={ this.state.strokeColor }
+                            onChangeComplete={ this.handleChangeStrokeColor }
+                          />
+                        </div>
+                        <Button onClick={e => this.setState({showStrokeColorPicker: false})}>
+                          Close color picker
+                        </Button>
+                      </Col>
+                    }
+                  </Row>
+                </Form>
+              </Accordion.Body>
+            </Accordion.Item>
+          </Accordion>
           <Row className="mb-2">
             <Col>
               <Button onClick={this.handleClick} disabled={this.state.text.trim() === "" || !this.state.done}>
@@ -317,7 +403,7 @@ class HandwritingScreen extends React.Component {
           </Row>
 
           {!this.state.done && 
-            <Row>
+            <Row className="mb-2">
               <Col>
                 <Row>
                   <Col>
@@ -333,12 +419,16 @@ class HandwritingScreen extends React.Component {
             </Row>
           }
           {this.state.done && this.state.points.length > 0 &&
-          <Row>
+          <Row className="mb-2">
             <Col>
-              <Button variant="secondary" onClick={this.handleZoomIn} disabled={!this.canZoomIn()}>
-                Zoom In
-              </Button>
-              <Button variant="secondary" onClick={this.handleZoomOut} disabled={!this.canZoomOut()}>Zoom out</Button>
+              <ButtonGroup size="sm">
+                <Button variant="secondary" onClick={this.handleZoomIn} disabled={!this.canZoomIn()}>
+                  Zoom In
+                </Button>
+                <Button variant="secondary" onClick={this.handleZoomOut} disabled={!this.canZoomOut()}>
+                  Zoom out
+                </Button>
+              </ButtonGroup>
             </Col>
           </Row>
           }
