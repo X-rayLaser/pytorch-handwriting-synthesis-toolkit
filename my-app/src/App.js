@@ -85,7 +85,6 @@ function calculateGeometry(points) {
 
 
 let worker = new Worker(new URL("./worker.js", import.meta.url));
-console.log(worker);
 
 
 class HandwritingScreen extends React.Component {
@@ -119,6 +118,7 @@ class HandwritingScreen extends React.Component {
     this.handleChange = this.handleChange.bind(this);
     this.handleBiasChange = this.handleBiasChange.bind(this);
     this.adjustCanvasSize = this.adjustCanvasSize.bind(this);
+    this.workerListener = null;
   }
 
   resetGeometry() {
@@ -146,46 +146,52 @@ class HandwritingScreen extends React.Component {
 
     this.context = this.canvasRef.current.getContext('2d');
     
-    worker.addEventListener('message', e => {
-
+    this.workerListener = e => {
       if (e.data.event === "resultsReady") {
-        
-        this.setState({
-          points:e.data.results,
-          done: true,
-          progress: 0
-        });
-        
+        this.handleCompletion(e);
       }
 
       if (e.data.event === "progressChanged") {
-        this.setState((state, cb) => {
-          let newPoints = [...state.points, ...e.data.results];
-          let newGeo = calculateGeometry(newPoints);
-          const maxWidth = 10000;
-          const maxHeight = 2000;
-          newGeo.width = Math.max(window.innerWidth, state.geometry.width, newGeo.width);
-          newGeo.height = Math.max(window.innerHeight, state.geometry.height, newGeo.height);
+        this.handleProgress(e);
+      }
+    };
 
-          newGeo.width = Math.min(newGeo.width, maxWidth);
-          newGeo.height = Math.min(newGeo.height, maxHeight);
 
-          if (newGeo.width > state.geometry.width) {
-            const extraWidth = Math.round(state.geometry.width / 2);
-            newGeo.width = state.geometry.width + extraWidth;
-          }
-          return {
-            geometry: newGeo,
-            canvasWidth: window.innerWidth,
-            canvasHeight: window.innerWidth / (newGeo.width / newGeo.height),
-            progress: e.data.value,
-            points: newPoints
-          }
-        });
-        
+    worker.addEventListener('message', this.workerListener);
+  }
+
+  handleProgress(e) {
+    this.setState((state, cb) => {
+      let newPoints = [...state.points, ...e.data.results];
+      let newGeo = calculateGeometry(newPoints);
+      const maxWidth = 10000;
+      const maxHeight = 2000;
+      newGeo.width = Math.max(window.innerWidth, state.geometry.width, newGeo.width);
+      newGeo.height = Math.max(window.innerHeight, state.geometry.height, newGeo.height);
+
+      newGeo.width = Math.min(newGeo.width, maxWidth);
+      newGeo.height = Math.min(newGeo.height, maxHeight);
+
+      if (newGeo.width > state.geometry.width) {
+        const extraWidth = Math.round(state.geometry.width / 2);
+        newGeo.width = state.geometry.width + extraWidth;
+      }
+      return {
+        geometry: newGeo,
+        canvasWidth: window.innerWidth,
+        canvasHeight: window.innerWidth / (newGeo.width / newGeo.height),
+        progress: e.data.value,
+        points: newPoints
       }
     });
-    
+  }
+
+  handleCompletion(e) {
+    this.setState({
+      points:e.data.results,
+      done: true,
+      progress: 0
+    });
   }
 
   componentDidUpdate() {
@@ -194,7 +200,9 @@ class HandwritingScreen extends React.Component {
 
   componentWillUnmount() {
     window.removeEventListener('resize', this.adjustCanvasSize);
-    worker.removeEventListener('message');
+    if (this.workerListener) {
+      worker.removeEventListener('message', this.workerListener);
+    }
   }
 
   adjustCanvasSize() {

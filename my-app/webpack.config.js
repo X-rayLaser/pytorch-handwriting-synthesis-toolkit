@@ -1,5 +1,6 @@
 const path = require('path');
 const CopyPlugin = require("copy-webpack-plugin");
+const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 module.exports = {
   target: ['web'],
@@ -31,13 +32,17 @@ module.exports = {
     ]
   },
   plugins: [new CopyPlugin({
-    // Use copy plugin to copy *.wasm to output folder.
-    patterns: [{ from: 'node_modules/onnxruntime-web/dist/*.wasm', to: '[name][ext]' }]
-  }),
-  new CopyPlugin({
-    // Use copy plugin to copy *.wasm to output folder.
-    patterns: [{ from: './*.onnx', to: '[name][ext]' }]
-  })
-],
-  mode: "production"
+      // Use copy plugin to copy *.wasm to output folder.
+      patterns: [{ from: 'node_modules/onnxruntime-web/dist/*.wasm', to: '[name][ext]' }]
+    }),
+    new CopyPlugin({
+      // Use copy plugin to copy *.onnx to output folder.
+      patterns: [{ from: './*.onnx', to: '[name][ext]' }]
+    }),
+    new HtmlWebpackPlugin({
+      filename: './index.html',
+      template: './src/index_template.html'
+    })
+  ],
+  mode: "development"
 };
