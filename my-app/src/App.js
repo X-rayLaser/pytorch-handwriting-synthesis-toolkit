@@ -9,46 +9,22 @@ import Col from 'react-bootstrap/Col';
 import Form from 'react-bootstrap/Form';
 import Accordion from 'react-bootstrap/Accordion';
 import { SketchPicker } from 'react-color';
+import CanvasDrawer from './drawing';
+
+let worker = new Worker(new URL("./worker.js", import.meta.url));
 
 
-class CanvasDrawer {
-  constructor(canvas, marginX, marginY, lineWidth, background, strokeColor) {
-    this.wasEos = false;
-    this.context = canvas.getContext('2d', { alpha: false});
-    this.marginX = marginX;
-    this.marginY = marginY;
-    this.context.clearRect(0, 0, canvas.width, canvas.height);
-    this.context.fillStyle = background;
-    this.context.strokeStyle = strokeColor;
-    if (background !== '#fff') {
-      this.context.fillRect(0, 0, canvas.width, canvas.height);
-    }
-    this.context.lineWidth = lineWidth || 30;
-    this.context.beginPath();
-  }
-
-  draw(points) {
-    const marginX = this.marginX;
-    const marginY = this.marginY;
-    const ctx = this.context;
-
-    points.forEach(p => {
-      if (this.wasEos) {
-        ctx.moveTo(p.x - marginX, p.y - marginY);
-        this.wasEos = false;
-      } else {
-        ctx.lineTo(p.x - marginX, p.y - marginY);
-      }
-
-      if (p.eos == 1) {
-        this.wasEos = true;
-      }
-    });
-  }
-
-  finish() {
-    this.context.stroke();
-  }
+export default function App() {
+  return (
+    <div>
+      <Container>
+        <h4 style={{ textAlign: 'center'}}>This is a handwriting synthesis demo. It is a Javascript port of 
+          <a href="https://github.com/X-rayLaser/pytorch-handwriting-synthesis-toolkit"> pytorch-handwriting-synthesis-toolkit</a> repository.
+        </h4>
+      </Container>
+      <HandwritingScreen />
+    </div>
+  );
 }
 
 
@@ -69,34 +45,6 @@ class VirtualSurface {
     calculateGeometry(points);
   }
 }
-
-
-function calculateGeometry(points) {
-  let minX = 100000;
-  let minY = 100000;
-  let maxX = -10000;
-  let maxY = -10000;
-
-  points.forEach(p => {
-    minX = Math.min(minX, p.x);
-    minY = Math.min(minY, p.y);
-
-    maxX = Math.max(maxX, p.x);
-    maxY = Math.max(maxY, p.y);
-  });
-
-  let width = maxX - minX;
-  let height = maxY - minY;
-  return {
-    minX,
-    minY,
-    width,
-    height
-  };
-}
-
-
-let worker = new Worker(new URL("./worker.js", import.meta.url));
 
 
 class HandwritingScreen extends React.Component {
@@ -323,77 +271,15 @@ class HandwritingScreen extends React.Component {
     return (
       <div className="App">
         <Container>
+          
           <textarea className="mb-2" placeholder="Enter text to generate a handwriting for" 
                     value={this.state.text} onChange={this.handleChange}>
 
           </textarea>
-          <Accordion collapse className="mb-2">
-            <Accordion.Item eventKey="0">
-              <Accordion.Header>Settings</Accordion.Header>
-              <Accordion.Body>
-                <Form>
-                  <Row className="align-items-center mb-2">
-
-                    <Col xs="auto" style={{margin: 'auto'}}>
-                      <Form.Label htmlFor="inlineFormInput">
-                        Bias
-                      </Form.Label>
-                        <Form.Control type="number" id="inlineFormInput"
-                                      value={this.state.bias} min={0} max={100} step={0.1} 
-                                      onChange={this.handleBiasChange} />
-                      </Col>
-                  </Row>
-                  <Row className="mb-2">
-
-                  {!this.state.showBackgroundPicker &&
-                    <Col>
-                      <Button onClick={e => this.setState({showBackgroundPicker: true})}>
-                        Choose background color
-                      </Button>
-                    </Col>
-                  }
-                  {this.state.showBackgroundPicker &&
-                    <Col>
-                      <div style={{width: 'auto'}}>
-                        <SketchPicker
-                          style={{margin:'auto'}}
-                          color={ this.state.background }
-                          onChangeComplete={ this.handleChangeBackground }
-                        />
-                      </div>
-                      <Button onClick={e => this.setState({showBackgroundPicker: false})}>
-                        Close color picker
-                      </Button>
-                    </Col>
-                  }
-                  </Row>
-                  <Row>
-                    {!this.state.showStrokeColorPicker &&
-                      <Col>
-                        <Button onClick={e => this.setState({showStrokeColorPicker: true})}>
-                          Choose stroke color
-                        </Button>
-                      </Col>
-                    }
-                    {this.state.showStrokeColorPicker &&
-                      <Col>
-                        <div style={{width: 'auto'}}>
-                          <SketchPicker
-                            style={{margin:'auto'}}
-                            color={ this.state.strokeColor }
-                            onChangeComplete={ this.handleChangeStrokeColor }
-                          />
-                        </div>
-                        <Button onClick={e => this.setState({showStrokeColorPicker: false})}>
-                          Close color picker
-                        </Button>
-                      </Col>
-                    }
-                  </Row>
-                </Form>
-              </Accordion.Body>
-            </Accordion.Item>
-          </Accordion>
+          <SettingsPanel bias={this.state.bias} 
+                         onChangeBackground={this.handleChangeBackground} 
+                         onChangeStrokeColor={this.handleChangeStrokeColor}
+                         onBiasChange={this.handleBiasChange} />
           <Row className="mb-2">
             <Col>
               <Button onClick={this.handleClick} disabled={this.state.text.trim() === "" || !this.state.done}>
@@ -402,40 +288,17 @@ class HandwritingScreen extends React.Component {
             </Col>
           </Row>
 
-          {!this.state.done && 
-            <Row className="mb-2">
-              <Col>
-                <Row>
-                  <Col>
-                    <h4>Generating a handwriting, please wait...</h4>
-                  </Col>
-                </Row>
-                <Row>
-                  <Col>
-                    <ProgressBar now={this.state.progress} />
-                  </Col>
-                </Row>
-              </Col>
-            </Row>
-          }
+          {!this.state.done && <InProgressPanel progress={this.state.progress} />}
           {this.state.done && this.state.points.length > 0 &&
-          <Row className="mb-2">
-            <Col>
-              <ButtonGroup size="sm">
-                <Button variant="secondary" onClick={this.handleZoomIn} disabled={!this.canZoomIn()}>
-                  Zoom In
-                </Button>
-                <Button variant="secondary" onClick={this.handleZoomOut} disabled={!this.canZoomOut()}>
-                  Zoom out
-                </Button>
-              </ButtonGroup>
-            </Col>
-          </Row>
+            <ZoomButtonsGroup onZoomIn={this.handleZoomIn} onZoomOut={this.handleZoomOut} 
+                              canZoomIn={this.canZoomIn()} canZoomOut={this.canZoomOut()} />
           }
         </Container>
         <div style={{ overflow: 'auto'}}>
           <canvas ref={this.canvasRef} width={this.state.geometry.width} height={this.state.geometry.height} 
-                  style={{ width: `${canvasWidth}px`, height: `${canvasHeight}px`}} ></canvas>
+                  style={{ width: `${canvasWidth}px`, height: `${canvasHeight}px`}} >
+
+          </canvas>
         </div>
       </div>
     );
@@ -443,17 +306,158 @@ class HandwritingScreen extends React.Component {
 }
 
 
-function App() {
+function SettingsPanel(props) {
   return (
-    <div>
-      <Container>
-        <h4 style={{ textAlign: 'center'}}>This is a handwriting synthesis demo. It is a Javascript port of 
-          <a href="https://github.com/X-rayLaser/pytorch-handwriting-synthesis-toolkit"> pytorch-handwriting-synthesis-toolkit</a> repository.
-        </h4>
-      </Container>
-      <HandwritingScreen />
+    <Accordion collapse className="mb-2">
+      <Accordion.Item eventKey="0">
+        <Accordion.Header>Settings</Accordion.Header>
+        <Accordion.Body>
+          <Form>
+            <Row className="align-items-center mb-2">
+
+              <Col xs="auto" style={{margin: 'auto'}}>
+                <Form.Label htmlFor="inlineFormInput">
+                  Bias
+                </Form.Label>
+                  <Form.Control type="number" id="inlineFormInput"
+                                value={props.bias} min={0} max={100} step={0.1} 
+                                onChange={e => props.onBiasChange(e)} />
+                </Col>
+            </Row>
+            <MyColorPicker label='Background color' onChangeComplete={e => props.onChangeBackground(e) } />
+            <MyColorPicker label='Stoke color' onChangeComplete={e => props.onChangeStrokeColor(e) } />
+          </Form>
+        </Accordion.Body>
+      </Accordion.Item>
+    </Accordion>
+  );
+}
+
+
+class MyColorPicker extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      show: false,
+      color: '#ffffff'
+    };
+
+    this.handleChange = this.handleChange.bind(this);
+    this.toggleShow = this.toggleShow.bind(this);
+  }
+  handleChange(color) {
+    this.setState({color: color.hex});
+    this.props.onChangeComplete(color);
+  }
+
+  toggleShow(e) {
+    this.setState((state, cb) => ({
+      show: !state.show
+    }));
+  }
+  render() {
+    let label = this.props.label || 'Color';
+    let buttonText;
+    if (this.state.show) {
+      buttonText = 'Close picker';
+    } else {
+      buttonText = 'Choose a color';
+    }
+
+    return (
+      <Row className="mb-2">
+        <Col>
+          <Form.Label className="mr-2">{label}:</Form.Label>
+          <FilledSquare color={this.state.color} />
+          <Button onClick={this.toggleShow}>
+            {buttonText}
+          </Button>
+        </Col>
+        {this.state.show &&
+          <Col>
+            <div style={{width: 'auto'}}>
+              <SketchPicker
+                style={{margin:'auto'}}
+                color={ this.state.color }
+                onChangeComplete={ this.handleChange }
+              />
+            </div>
+          </Col>
+        }
+      </Row>
+    );
+  }
+}
+
+
+function FilledSquare(props) {
+  let size = props.size || 25;
+  return (
+    <div style={{width: `${size}px`, height: `${size}px`, background: props.color, display: 'inline-block'}}>
     </div>
   );
 }
 
-export default App;
+
+function InProgressPanel(props) {
+  const text = props.text || "Generating a handwriting, please wait...";
+  return (
+    <Row className="mb-2">
+      <Col>
+        <Row>
+          <Col>
+            <h4>{text}</h4>
+          </Col>
+        </Row>
+        <Row>
+          <Col>
+            <ProgressBar now={props.progress} />
+          </Col>
+        </Row>
+      </Col>
+    </Row>
+  );
+}
+
+
+function ZoomButtonsGroup(props) {
+  return (
+    <Row className="mb-2">
+      <Col>
+        <ButtonGroup size="sm">
+          <Button variant="secondary" onClick={e => props.onZoomIn(e)} disabled={!props.canZoomIn}>
+            Zoom In
+          </Button>
+          <Button variant="secondary" onClick={e => props.onZoomOut(e)} disabled={!props.canZoomOut}>
+            Zoom out
+          </Button>
+        </ButtonGroup>
+      </Col>
+    </Row>
+  );
+}
+
+
+function calculateGeometry(points) {
+  let minX = 100000;
+  let minY = 100000;
+  let maxX = -10000;
+  let maxY = -10000;
+
+  points.forEach(p => {
+    minX = Math.min(minX, p.x);
+    minY = Math.min(minY, p.y);
+
+    maxX = Math.max(maxX, p.x);
+    maxY = Math.max(maxY, p.y);
+  });
+
+  let width = maxX - minX;
+  let height = maxY - minY;
+  return {
+    minX,
+    minY,
+    width,
+    height
+  };
+}
