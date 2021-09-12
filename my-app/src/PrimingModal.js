@@ -1,14 +1,21 @@
 import React from 'react';
 import Modal from 'react-bootstrap/Modal';
 import Form from 'react-bootstrap/Form';
+import Button from 'react-bootstrap/Button';
 
 
 export default class PrimingModal extends React.Component {
     constructor(props) {
         super(props);
-        this.state = {};
+        this.state = {
+            text: "",
+            handwriting: []
+        };
     }
     render() {
+        const show = this.props.show;
+        const handleClose = this.props.onClose;
+
         return (
             <Modal show={show} onHide={handleClose}>
                 <Modal.Header closeButton>

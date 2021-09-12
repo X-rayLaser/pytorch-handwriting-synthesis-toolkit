@@ -10,6 +10,8 @@ import Form from 'react-bootstrap/Form';
 import Accordion from 'react-bootstrap/Accordion';
 import { SketchPicker } from 'react-color';
 import CanvasDrawer from './drawing';
+import PrimingModal from './PrimingModal';
+import ScalableCanvas from './ScalableCanvas';
 
 let worker = new Worker(new URL("./worker.js", import.meta.url));
 
@@ -306,31 +308,69 @@ class HandwritingScreen extends React.Component {
 }
 
 
-function SettingsPanel(props) {
-  return (
-    <Accordion collapse className="mb-2">
-      <Accordion.Item eventKey="0">
-        <Accordion.Header>Settings</Accordion.Header>
-        <Accordion.Body>
-          <Form>
-            <Row className="align-items-center mb-2">
+class SettingsPanel extends React.Component {
+  constructor(props) {
+    super(props);
 
-              <Col xs="auto" style={{margin: 'auto'}}>
-                <Form.Label htmlFor="inlineFormInput">
-                  Bias
-                </Form.Label>
-                  <Form.Control type="number" id="inlineFormInput"
-                                value={props.bias} min={0} max={100} step={0.1} 
-                                onChange={e => props.onBiasChange(e)} />
-                </Col>
-            </Row>
-            <MyColorPicker label='Background color' onChangeComplete={e => props.onChangeBackground(e) } />
-            <MyColorPicker label='Stoke color' onChangeComplete={e => props.onChangeStrokeColor(e) } />
-          </Form>
-        </Accordion.Body>
-      </Accordion.Item>
-    </Accordion>
-  );
+    this.itemRef = React.createRef();
+    this.bodyRef = React.createRef();
+
+    this.state = {
+      width: window.innerWidth
+    };
+  }
+
+  componentDidMount() {
+    this.updateWidth();
+  }
+
+  componentDidUpdate() {
+    this.updateWidth();
+  }
+
+  updateWidth() {
+    const element = this.itemRef.current;
+    const body = this.bodyRef.current;
+    const computedStyle = window.getComputedStyle(body);
+    const width = element.offsetWidth - (parseFloat(computedStyle.paddingLeft) + parseFloat(computedStyle.paddingRight));
+
+    if (width !== this.state.width) {
+      this.setState({width});
+    }
+  }
+
+  render() {
+    return (
+      <Accordion collapse className="mb-2">
+        <Accordion.Item eventKey="0">
+          <Accordion.Header>Settings</Accordion.Header>
+          <Accordion.Body>
+            <Form>
+              <Row className="align-items-center mb-2">
+
+                <Col xs="auto" style={{margin: 'auto'}}>
+                  <Form.Label htmlFor="inlineFormInput">
+                    Bias
+                  </Form.Label>
+                    <Form.Control type="number" id="inlineFormInput"
+                                  value={this.props.bias} min={0} max={100} step={0.1} 
+                                  onChange={e => this.props.onBiasChange(e)} />
+                  </Col>
+              </Row>
+              <MyColorPicker label='Background color' onChangeComplete={e => this.props.onChangeBackground(e) } />
+              <MyColorPicker label='Stoke color' onChangeComplete={e => this.props.onChangeStrokeColor(e) } />
+            </Form>
+          </Accordion.Body>
+        </Accordion.Item>
+        <Accordion.Item eventKey="1">
+          <Accordion.Header ref={this.itemRef}>Custom style</Accordion.Header>
+          <Accordion.Body ref={this.bodyRef}>
+            <ScalableCanvas parentWidth={this.state.width}/>
+          </Accordion.Body>
+        </Accordion.Item>
+      </Accordion>
+    );
+  }
 }
 
 
