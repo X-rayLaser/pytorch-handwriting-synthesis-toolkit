@@ -70,7 +70,9 @@ class HandwritingScreen extends React.Component {
         y: 200,
         width: defaultLogicalWidth,
         height: defaultLogicalHeight
-      }
+      },
+      primingText: "",
+      primingSequence: []
     };
 
     this.context = null;
@@ -206,7 +208,7 @@ class HandwritingScreen extends React.Component {
     this.resetGeometry();
     this.setState({points: [], done: false});
 
-    worker.postMessage([this.state.text, this.state.bias]);
+    worker.postMessage([this.state.text, this.state.bias, this.state.primingSequence, this.state.primingText]);
   }
 
   handleZoomIn() {
@@ -278,10 +280,13 @@ class HandwritingScreen extends React.Component {
                     value={this.state.text} onChange={this.handleChange}>
 
           </textarea>
-          <SettingsPanel bias={this.state.bias} 
+          <SettingsPanel bias={this.state.bias} primingText={this.state.primingText}
                          onChangeBackground={this.handleChangeBackground} 
                          onChangeStrokeColor={this.handleChangeStrokeColor}
-                         onBiasChange={this.handleBiasChange} />
+                         onBiasChange={this.handleBiasChange}
+                         onPrimingTextChange={e => this.setState({primingText: e.target.value})}
+                         onPrimingSequenceChange={points => this.setState({primingSequence: points})}
+                          />
           <Row className="mb-2">
             <Col>
               <Button onClick={this.handleClick} disabled={this.state.text.trim() === "" || !this.state.done}>
@@ -365,7 +370,13 @@ class SettingsPanel extends React.Component {
         <Accordion.Item eventKey="1">
           <Accordion.Header ref={this.itemRef}>Custom style</Accordion.Header>
           <Accordion.Body ref={this.bodyRef}>
-            <ScalableCanvas parentWidth={this.state.width}/>
+            <p>Priming is a easy and fast way to make a synthesis network adapt to your style of writing.
+              You only need to provide an arbitrary piece of text and a corresponding handwriting. You can enter a 
+              text into a text field below. Then, you need to create a handwritten version of the text by writing on a canvas.
+            </p>
+            <Form.Control type="text" value={this.props.primingText} placeholder="Enter a text used for priming"
+                          onChange={e => this.props.onPrimingTextChange(e)} />
+            <ScalableCanvas parentWidth={this.state.width} onPrimingSequenceChange={e => this.props.onPrimingSequenceChange(e)}/>
           </Accordion.Body>
         </Accordion.Item>
       </Accordion>

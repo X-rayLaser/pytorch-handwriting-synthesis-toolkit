@@ -112,6 +112,8 @@ export default class ScalableCanvas extends React.Component {
                 recordingMode: true,
                 points: [...state.points, dataPoint]
             };
+        }, () => {
+            this.props.onPrimingSequenceChange(this.state.points);
         });
     }
 
@@ -125,7 +127,9 @@ export default class ScalableCanvas extends React.Component {
 
         this.setState((state, cb) => ({
             points: [...state.points, dataPoint]
-        }));   
+        }), () => {
+            this.props.onPrimingSequenceChange(this.state.points);
+        });
     }
 
     handleMouseUp(e) {
@@ -136,6 +140,8 @@ export default class ScalableCanvas extends React.Component {
                 recordingMode: false,
                 points: [...state.points, dataPoint]
             };
+        }, () => {
+            this.props.onPrimingSequenceChange(this.state.points);
         });
     }
 
