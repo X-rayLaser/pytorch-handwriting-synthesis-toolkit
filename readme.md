@@ -1,5 +1,8 @@
 ![Handwriting image](results/Handwriting_synthesis_in_Python.png)
 
+
+See the demo [here](https://x-raylaser.github.io/pytorch-handwriting-synthesis-toolkit/).
+
 # Introduction
 
 This toolkit contains utilities used to replicate some experiments described in Alex Graves's paper 
