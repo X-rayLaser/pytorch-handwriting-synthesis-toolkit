@@ -196,11 +196,6 @@ class HandwritingScreen extends React.Component {
       return;
     }
 
-    if (this.state.text.length < 6) {
-      window.alert("Text must contain at least 6 characters. Please, try again.");
-      return;
-    }
-
     if (this.state.text.length >= 50) {
       window.alert("Text must contain fewer thatn 50 characters. Please, try again.");
       return;
@@ -277,7 +272,7 @@ class HandwritingScreen extends React.Component {
         <Container>
           
           <textarea className="mb-2" placeholder="Enter text to generate a handwriting for" 
-                    value={this.state.text} onChange={this.handleChange}>
+                    value={this.state.text} onChange={this.handleChange} maxLength="49">
 
           </textarea>
           <SettingsPanel bias={this.state.bias} primingText={this.state.primingText}
