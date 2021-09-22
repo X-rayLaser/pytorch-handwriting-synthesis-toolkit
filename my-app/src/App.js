@@ -13,7 +13,92 @@ import CanvasDrawer from './drawing';
 import PrimingModal from './PrimingModal';
 import ScalableCanvas from './ScalableCanvas';
 
+
+class CanvasConfiguration {
+  constructor(backgroundColor='#fff', strokeColor='#000') {
+    this.backgroundColor = backgroundColor;
+    this.strokeColor = strokeColor;
+    this.listener = null;
+  }
+
+  update(backgroundColor, strokeColor) {
+    this.backgroundColor = backgroundColor;
+    this.strokeColor = strokeColor;
+    this.listener(this);
+  }
+
+  setListener(listener) {
+    this.listener = listener;
+  }
+}
+
+
+class HandwritingGenerationExecutor {
+  constructor(worker) {
+    this.subscribers = new Map();
+
+    let workerListener = e => {
+      if (e.data.event === "resultsReady") {
+        this.notify("resultsReady", e.data.results);
+      }
+
+      if (e.data.event === "progressChanged") {
+        this.notify("progressChanged", e.data.results, e.data.value);
+      }
+    };
+
+    worker.addEventListener('message', workerListener);
+  }
+
+  runNewJob(text, bias, primingSequence, primingText) {
+    this.notify("start");
+    worker.postMessage([text, bias, primingSequence, primingText]);
+  }
+
+  notify(eventType, ...args) {
+    if (!this.subscribers.has(eventType)) {
+      return;
+    }
+
+    for (let subscriber of this.subscribers.get(eventType)) {
+      subscriber(...args);
+    }
+  }
+
+  abort() {
+    //do nothing for now
+    //todo:redesign worker to spawn its own workers
+  }
+
+  subscribe(eventType, listener) {
+    if (!this.subscribers.has(eventType)) {
+      this.subscribers.set(eventType, []);
+    }
+
+    let arr = this.subscribers.get(eventType);
+    arr.push(listener);
+  }
+
+  unsubscribe(eventType, listener) {
+    if (!this.subscribers.has(eventType)) {
+      return;
+    }
+
+    let eventSubscribers = this.subscribers.get(eventType);
+    let index = eventSubscribers.indexOf(listener);
+    if (index === -1) {
+      console.error("Listener not found!!!");
+      return;
+    }
+
+    eventSubscribers.splice(index, 1);
+  }
+}
+
+
 let worker = new Worker(new URL("./worker.js", import.meta.url));
+let canvasConfig = new CanvasConfiguration();
+let executor = new HandwritingGenerationExecutor(worker);
 
 
 export default function App() {
@@ -30,21 +115,81 @@ export default function App() {
 }
 
 
-class VirtualSurface {
+class VirtualCanvas {
   //the idea is to scale down all coordinates and then calculate the canvas size which will be smaller
   //thus performance should go up
-  constructor(scaleFactor) {
-    this.points = [];
+  constructor(onArrival, onGeometryChange, scaleFactor=1) {
+    this.buffer = [];
+    this.lastChunk = [];
     this.scale = scaleFactor;
+    this.minX = 0;
+    this.minY = 0;
+    this.maxX = 0;
+    this.maxY = 0;
+
+    this.onArrival = onArrival;
+    this.onGeometryChange = onGeometryChange;
+
+    this.MAX_WIDTH = 10000;
+    this.MAX_HEIGHT = 4000;
   }
   
-  push(points) {
-    this.points.push(...points);
+  addChunk(points) {
+    let scaled = points.map(p => ({x: p.x * this.scale, y: p.y * this.scale, eos: p.eos}));
+    let scaledX = scaled.map(p => p.x);
+    let scaledY = scaled.map(p => p.y);
+
+    let newMinX = Math.min(this.minX, ...scaledX);
+    let newMinY = Math.min(this.minY, ...scaledY);
+
+    let newMaxX = Math.max(this.maxX, ...scaledX);
+    let newMaxY = Math.max(this.maxY, ...scaledY);
+
+    if (newMinX !== this.minX || newMinY !== this.minY || newMaxX !== this.maxX || newMaxY !== this.maxY) {
+      if (this.getWidth() > this.MAX_WIDTH || this.getHeight() > this.MAX_HEIGHT) {
+        throw "Exceeded maximum size";
+      }
+      this.onGeometryChange(this);
+    }
+
+    this.minX = newMinX;
+    this.minY = newMinY;
+    this.maxX = newMaxX;
+    this.maxY = newMaxY;
+
+    this.lastChunk = scaled;
+    this.buffer.push(...scaled);
+
+    this.onArrival(this);
   }
 
-  calculateGeometry() {
-    let points = this.points.map(p => p / this.scale);
-    calculateGeometry(points);
+  getWidth() {
+    return this.maxX - this.minX; 
+  }
+
+  getHeight() {
+    return this.maxY - this.minY;
+  }
+
+  getPoints() {
+    return this.zeroOffset(this.buffer);
+  }
+
+  getLastChunk() {
+    return this.zeroOffset(this.lastChunk);
+  }
+
+  zeroOffset(points) {
+    return points.map(p => ({x: p.x - this.minX, y: p.y - this.minY, eos: p.eos}));
+  }
+
+  reset() {
+    this.lastChunk = [];
+    this.buffer = [];
+    this.minX = 0;
+    this.minY = 0;
+    this.maxX = 0;
+    this.maxY = 0;
   }
 }
 
@@ -52,12 +197,14 @@ class VirtualSurface {
 class HandwritingScreen extends React.Component {
   constructor(props) {
     super(props);
-    this.canvasRef= React.createRef();
 
-    let defaultLogicalWidth = window.innerWidth;
-    let defaultLogicalHeight = 1000;
+    this.resolution = 0.5;
+
+    let defaultLogicalWidth = window.innerWidth * this.resolution;
+    let defaultLogicalHeight = window.innerHeight * this.resolution;
 
     this.state = {
+      scale: 1,
       points: [],
       text: "",
       done: true,
@@ -65,12 +212,7 @@ class HandwritingScreen extends React.Component {
       showBackgroundPicker: false,
       showStrokeColorPicker: false,
       background: '#fff',
-      geometry: {
-        x: 200,
-        y: 200,
-        width: defaultLogicalWidth,
-        height: defaultLogicalHeight
-      },
+      strokeColor: '#000',
       primingText: "",
       primingSequence: []
     };
@@ -85,81 +227,27 @@ class HandwritingScreen extends React.Component {
     this.handleChangeStrokeColor = this.handleChangeStrokeColor.bind(this);
     this.handleBiasChange = this.handleBiasChange.bind(this);
     this.adjustCanvasSize = this.adjustCanvasSize.bind(this);
-    this.workerListener = null;
-  }
 
-  resetGeometry() {
-    let defaultLogicalWidth = window.innerWidth;
-    let defaultLogicalHeight = 1000;
-
-    this.setState({
-      scale: 1,
-      geometry: {
-        x: 200,
-        y: 200,
-        width: defaultLogicalWidth,
-        height: defaultLogicalHeight
-      }
-    });
-  }
-
-  getAspectRatio() {
-    return this.state.geometry.width / this.state.geometry.height;
+    this.onProgressListener = null;
+    this.onCompleteListener = null;
   }
 
   componentDidMount() {
     window.addEventListener('resize', this.adjustCanvasSize);
-
-    this.context = this.canvasRef.current.getContext('2d');
-    
-    this.workerListener = e => {
-      if (e.data.event === "resultsReady") {
-        this.handleCompletion(e);
-      }
-
-      if (e.data.event === "progressChanged") {
-        this.handleProgress(e);
-      }
+ 
+    this.onCompleteListener = (points) => {
+      this.handleCompletion();
     };
 
-
-    worker.addEventListener('message', this.workerListener);
+    executor.subscribe("resultsReady", this.onCompleteListener);
   }
 
-  handleProgress(e) {
-    this.setState((state, cb) => {
-      let newPoints = [...state.points, ...e.data.results];
-      let newGeo = calculateGeometry(newPoints);
-      const maxWidth = 10000;
-      const maxHeight = 2000;
-      newGeo.width = Math.max(window.innerWidth, state.geometry.width, newGeo.width);
-      newGeo.height = Math.max(window.innerHeight, state.geometry.height, newGeo.height);
-
-      newGeo.width = Math.min(newGeo.width, maxWidth);
-      newGeo.height = Math.min(newGeo.height, maxHeight);
-
-      if (newGeo.width > state.geometry.width) {
-        const extraWidth = Math.round(state.geometry.width / 2);
-        newGeo.width = state.geometry.width + extraWidth;
-      }
-      return {
-        geometry: newGeo,
-        progress: e.data.value,
-        points: newPoints
-      }
-    });
-  }
-
-  handleCompletion(e) {
-    this.setState({
-      points:e.data.results,
-      done: true,
-      progress: 0
-    });
+  handleCompletion() {
+    this.setState({points: [], done: true, progress: 0});
   }
 
   componentDidUpdate() {
-    this.updateCanvas();
+    console.log('Did update!!!');
   }
 
   componentWillUnmount() {
@@ -167,27 +255,12 @@ class HandwritingScreen extends React.Component {
     if (this.workerListener) {
       worker.removeEventListener('message', this.workerListener);
     }
+
+    executor.unsubscribe("resultsReady", this.onCompleteListener);
   }
 
   adjustCanvasSize() {
     this.forceUpdate();
-  }
-
-  updateCanvas() {
-    const canvas = this.canvasRef.current;
-
-    const marginX = this.state.geometry.minX;
-    const marginY = this.state.geometry.minY;
-
-    const minWidth = 5;
-    let canvasWidth = window.innerWidth * this.state.scale;
-    const lineWidth = Math.floor(this.state.geometry.width / canvasWidth) + minWidth;
-    const backgroundColor = this.state.background;
-    const strokeColor = this.state.strokeColor;
-    const drawer = new CanvasDrawer(canvas, marginX, marginY, lineWidth, backgroundColor, strokeColor);
-
-    drawer.draw(this.state.points);
-    drawer.finish();
   }
 
   handleClick() {
@@ -196,14 +269,14 @@ class HandwritingScreen extends React.Component {
       return;
     }
 
-    if (this.state.text.length >= 50) {
-      window.alert("Text must contain fewer thatn 50 characters. Please, try again.");
+    if (this.state.text.length >= 100) {
+      window.alert("Text must contain fewer thatn 100 characters. Please, try again.");
       return;
     }
-    this.resetGeometry();
+    
     this.setState({points: [], done: false});
 
-    worker.postMessage([this.state.text, this.state.bias, this.state.primingSequence, this.state.primingText]);
+    executor.runNewJob(this.state.text, this.state.bias, this.state.primingSequence, this.state.primingText);
   }
 
   handleZoomIn() {
@@ -257,22 +330,21 @@ class HandwritingScreen extends React.Component {
 
   handleChangeBackground(color) {
     this.setState({background: color.hex});
+    canvasConfig.update(color.hex, this.state.strokeColor);
   }
 
   handleChangeStrokeColor(color) {
     this.setState({strokeColor: color.hex});
+    canvasConfig.update(this.state.background, color.hex);
   }
   render() {
-    let scaledWidth = window.innerWidth * this.state.scale;
-    let canvasHeight = Math.round(scaledWidth / this.getAspectRatio());
-    let canvasWidth = Math.round(scaledWidth);
 
     return (
       <div className="App">
         <Container>
           
           <textarea className="mb-2" placeholder="Enter text to generate a handwriting for" 
-                    value={this.state.text} onChange={this.handleChange} maxLength="49">
+                    value={this.state.text} onChange={this.handleChange} maxLength="99">
 
           </textarea>
           <SettingsPanel bias={this.state.bias} primingText={this.state.primingText}
@@ -290,19 +362,158 @@ class HandwritingScreen extends React.Component {
             </Col>
           </Row>
 
-          {!this.state.done && <InProgressPanel progress={this.state.progress} />}
-          {this.state.done && this.state.points.length > 0 &&
+          {!this.state.done && <InProgressPanel />}
+          {this.state.done &&
             <ZoomButtonsGroup onZoomIn={this.handleZoomIn} onZoomOut={this.handleZoomOut} 
                               canZoomIn={this.canZoomIn()} canZoomOut={this.canZoomOut()} />
           }
         </Container>
         <div style={{ overflow: 'auto'}}>
-          <canvas ref={this.canvasRef} width={this.state.geometry.width} height={this.state.geometry.height} 
-                  style={{ width: `${canvasWidth}px`, height: `${canvasHeight}px`}} >
-
-          </canvas>
+          <MyCanvas scale={this.state.scale} />
         </div>
       </div>
+    );
+  }
+}
+
+
+class MyCanvas extends React.Component {
+  constructor(props) {
+    super(props);
+
+    this.INITIAL_WIDTH = window.innerWidth / 2;
+    this.INITIAL_HEIGHT = window.innerHeight / 8;
+    this.RESOLUTION = 0.25;
+
+    this.canvasRef = React.createRef();
+    this.writer = null;
+    this.virtualCanvas = null;
+
+    this.onStartListener = null;
+    this.onProgressListener = null;
+    this.onConfigChangeListener = null;
+  }
+
+  componentDidMount() {
+    console.log('canvas mounted')
+    //window.addEventListener('resize', this.adjustCanvasSize);
+    let canvas = this.canvasRef.current;
+    this.writer = new CanvasDrawer(canvas, 5, '#fff', '#000');
+    this.virtualCanvas = this.makeVirtualCanvas();
+
+    this.onStartListener = () => {
+      console.log("on Start!")
+      canvas.width = this.INITIAL_WIDTH;
+      canvas.height = this.INITIAL_HEIGHT;
+      console.log(canvas.height);
+      
+      this.updateVisibleSize();
+
+      this.virtualCanvas.reset();
+      this.writer.reset();
+    };
+
+    this.onProgressListener = (points, progress) => {
+      this.virtualCanvas.addChunk(points);
+    };
+
+    executor.subscribe("start", this.onStartListener);
+    executor.subscribe("progressChanged", this.onProgressListener);
+
+    this.onConfigChangeListener = (config) => {
+      this.writer.setBackgroundColor(config.backgroundColor);
+      this.writer.setLineColor(config.strokeColor);
+      this.redrawCanvas();
+    }
+
+    canvasConfig.setListener(this.onConfigChangeListener);
+  }
+
+  componentWillUnMount() {
+    console.log('canvas will be mounted')
+    executor.unsubscribe("start", this.onStartListener);
+    executor.unsubscribe("progressChanged", this.onProgressListener);
+  }
+
+  componentDidUpdate() {
+    console.log('Did update mycanvas !!!');
+  }
+
+  makeVirtualCanvas() {
+    const onArrival = virtualCanvas => {
+      this.writer.draw(virtualCanvas.getLastChunk());
+      this.writer.finish();
+    }
+
+    const onGeometryChange = virtualCanvas => {
+      let canvas = this.canvasRef.current;
+
+      let context = canvas.getContext('2d');
+
+      if (canvas.width < virtualCanvas.getWidth() || canvas.height < virtualCanvas.getHeight()) {
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        if (canvas.width < virtualCanvas.getWidth()) {
+          canvas.width = virtualCanvas.getWidth() * 1.5;
+        }
+
+        if (canvas.height < virtualCanvas.getHeight()) {
+          canvas.height = virtualCanvas.getHeight() * 1.25;
+        }
+
+        this.updateVisibleSize();
+        this.redrawCanvas();
+      }
+    }
+
+    // todo: floating/dynamic scaling factor ()
+    return new VirtualCanvas(onArrival, onGeometryChange, this.RESOLUTION);
+  }
+
+  updateVisibleSize() {
+    let canvas = this.canvasRef.current;
+    let scaledWidth = window.innerWidth * this.props.scale;
+    let aspectRatio = canvas.width / canvas.height;
+    let canvasHeight = Math.round(scaledWidth / aspectRatio);
+    let canvasWidth = Math.round(scaledWidth);
+
+    canvas.setAttribute("style", `width:${canvasWidth}px;height:${canvasHeight}px`);
+    canvas.style.width = `${canvasWidth}px`;
+    canvas.style.height = `${canvasHeight}px`;
+  }
+
+  redrawCanvas() {
+    console.log("redrawing")
+    const minWidth = 2;
+
+    let canvas = this.canvasRef.current;
+    let scaledWidth = window.innerWidth * this.props.scale;
+    let lineWidth = Math.floor(canvas.width / scaledWidth) + minWidth;
+
+    let points = this.virtualCanvas.getPoints();
+
+    this.writer.setWidth(lineWidth);
+    this.writer.reset();
+    this.writer.draw(points);
+    this.writer.finish();
+  }
+
+  getAspectRatio() {
+    let canvas = this.canvasRef.current;
+    if (canvas) {
+      return canvas.width / canvas.height;
+    }
+    return this.INITIAL_WIDTH / this.INITIAL_HEIGHT;
+  }
+  render() {
+    let scaledWidth = window.innerWidth * this.props.scale;
+    let canvasHeight = Math.round(scaledWidth / this.getAspectRatio());
+    let canvasWidth = Math.round(scaledWidth);
+
+    return (
+      <canvas ref={this.canvasRef} width={this.INITIAL_WIDTH} height={this.INITIAL_HEIGHT} 
+              style={{ width: `${canvasWidth}px`, height: `${canvasHeight}px`}} >
+
+      </canvas>
     );
   }
 }
@@ -445,24 +656,47 @@ function FilledSquare(props) {
 }
 
 
-function InProgressPanel(props) {
-  const text = props.text || "Generating a handwriting, please wait...";
-  return (
-    <Row className="mb-2">
-      <Col>
-        <Row>
-          <Col>
-            <h4>{text}</h4>
-          </Col>
-        </Row>
-        <Row>
-          <Col>
-            <ProgressBar now={props.progress} />
-          </Col>
-        </Row>
-      </Col>
-    </Row>
-  );
+class InProgressPanel extends React.Component {
+  constructor(props) {
+    super(props);
+
+    this.state = {
+      progress: 0
+    };
+
+    this.progressChangedListener = (results, progress) => {
+      this.setState({progress});
+    };
+  }
+
+  componentDidMount() {
+    executor.subscribe("progressChanged", this.progressChangedListener);
+  }
+
+  componentWillUnmount() {
+    executor.unsubscribe("progressChanged", this.progressChangedListener);
+  }
+
+  render() {
+
+    const text = this.props.text || "Generating a handwriting, please wait...";
+    return (
+      <Row className="mb-2">
+        <Col>
+          <Row>
+            <Col>
+              <h4>{text}</h4>
+            </Col>
+          </Row>
+          <Row>
+            <Col>
+              <ProgressBar now={this.state.progress} />
+            </Col>
+          </Row>
+        </Col>
+      </Row>
+    );
+  }
 }
 
 
