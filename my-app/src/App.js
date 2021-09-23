@@ -39,11 +39,11 @@ class HandwritingGenerationExecutor {
 
     let workerListener = e => {
       if (e.data.event === "resultsReady") {
-        this.notify("resultsReady", e.data.results);
-      }
-
-      if (e.data.event === "progressChanged") {
-        this.notify("progressChanged", e.data.results, e.data.value);
+        this.notify(e.data.event, e.data.results);
+      } else if (e.data.event === "progressChanged") {
+        this.notify(e.data.event, e.data.results, e.data.value);
+      } else if (e.data.event === "aborted") {
+        this.notify(e.data.event);
       }
     };
 
@@ -52,7 +52,10 @@ class HandwritingGenerationExecutor {
 
   runNewJob(text, bias, primingSequence, primingText) {
     this.notify("start");
-    worker.postMessage([text, bias, primingSequence, primingText]);
+    worker.postMessage({
+      event: "start",
+      params: [text, bias, primingSequence, primingText]
+    });
   }
 
   notify(eventType, ...args) {
@@ -66,8 +69,11 @@ class HandwritingGenerationExecutor {
   }
 
   abort() {
-    //do nothing for now
-    //todo:redesign worker to spawn its own workers
+    console.log('Aborting...')
+    worker.postMessage({
+      event: "abort",
+      params: []
+    });
   }
 
   subscribe(eventType, listener) {
@@ -96,7 +102,7 @@ class HandwritingGenerationExecutor {
 }
 
 
-let worker = new Worker(new URL("./worker.js", import.meta.url));
+let worker = new Worker(new URL("./worker_manager.js", import.meta.url));
 let canvasConfig = new CanvasConfiguration();
 let executor = new HandwritingGenerationExecutor(worker);
 
@@ -200,14 +206,12 @@ class HandwritingScreen extends React.Component {
 
     this.resolution = 0.5;
 
-    let defaultLogicalWidth = window.innerWidth * this.resolution;
-    let defaultLogicalHeight = window.innerHeight * this.resolution;
-
     this.state = {
       scale: 1,
       points: [],
       text: "",
       done: true,
+      operationStatus: "ready",
       bias: 0.5,
       showBackgroundPicker: false,
       showStrokeColorPicker: false,
@@ -230,6 +234,7 @@ class HandwritingScreen extends React.Component {
 
     this.onProgressListener = null;
     this.onCompleteListener = null;
+    this.onAbortedListener = null;
   }
 
   componentDidMount() {
@@ -239,7 +244,14 @@ class HandwritingScreen extends React.Component {
       this.handleCompletion();
     };
 
+    this.onAbortedListener = () => {
+
+      console.log('Aborted!')
+      this.setState({points: [], done: true, progress: 0, operationStatus: "ready"});
+    }
+
     executor.subscribe("resultsReady", this.onCompleteListener);
+    executor.subscribe("aborted", this.onAbortedListener);
   }
 
   handleCompletion() {
@@ -257,6 +269,7 @@ class HandwritingScreen extends React.Component {
     }
 
     executor.unsubscribe("resultsReady", this.onCompleteListener);
+    executor.unsubscribe("aborted", this.onAbortedListener);
   }
 
   adjustCanvasSize() {
@@ -264,6 +277,18 @@ class HandwritingScreen extends React.Component {
   }
 
   handleClick() {
+    if (this.state.done) {
+      this.runNewJob();
+      return;
+    }
+
+    if (this.state.operationStatus === "running") {
+      this.setState({operationStatus: "halting"});
+      executor.abort();
+    }
+  }
+
+  runNewJob() {
     if (this.state.bias < 0) {
       window.alert("Negative bias is not allowed!");
       return;
@@ -274,7 +299,7 @@ class HandwritingScreen extends React.Component {
       return;
     }
     
-    this.setState({points: [], done: false});
+    this.setState({points: [], done: false, operationStatus: "running"});
 
     executor.runNewJob(this.state.text, this.state.bias, this.state.primingSequence, this.state.primingText);
   }
@@ -338,6 +363,29 @@ class HandwritingScreen extends React.Component {
     canvasConfig.update(this.state.background, color.hex);
   }
   render() {
+    let disableButton;
+    let buttonText;
+
+    if (this.state.done) {
+      buttonText = "Generate handwriting";
+      disableButton = (this.state.text.trim() === "");
+    } else {
+      buttonText = "Abort";
+      let operationStatus = this.state.operationStatus;
+
+      if (operationStatus === "starting") {
+        buttonText = "Generate handwriting";
+        disableButton = true;
+      } else if (operationStatus === "running") {
+        buttonText = "Abort";
+        disableButton = false;
+      } else if (operationStatus === "halting") {
+        buttonText = "Abort";
+        disableButton = true;
+      } else {
+        console.error("Unhandled case");
+      }
+    }
 
     return (
       <div className="App">
@@ -356,8 +404,8 @@ class HandwritingScreen extends React.Component {
                           />
           <Row className="mb-2">
             <Col>
-              <Button onClick={this.handleClick} disabled={this.state.text.trim() === "" || !this.state.done}>
-                Generate handwriting
+              <Button onClick={this.handleClick} disabled={disableButton}>
+                {buttonText}
               </Button>
             </Col>
           </Row>
