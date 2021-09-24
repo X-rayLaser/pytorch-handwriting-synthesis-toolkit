@@ -2,6 +2,7 @@ import './App.css';
 import React from 'react';
 import Button from 'react-bootstrap/Button';
 import ButtonGroup from 'react-bootstrap/ButtonGroup';
+import Alert from 'react-bootstrap/Alert';
 import ProgressBar from 'react-bootstrap/ProgressBar';
 import Container from 'react-bootstrap/Container';
 import Row from 'react-bootstrap/Row';
@@ -10,7 +11,6 @@ import Form from 'react-bootstrap/Form';
 import Accordion from 'react-bootstrap/Accordion';
 import { SketchPicker } from 'react-color';
 import CanvasDrawer from './drawing';
-import PrimingModal from './PrimingModal';
 import ScalableCanvas from './ScalableCanvas';
 
 
@@ -48,6 +48,9 @@ class HandwritingGenerationExecutor {
     };
 
     worker.addEventListener('message', workerListener);
+    worker.onerror = e => {
+      this.notify("error", e);
+    }
   }
 
   runNewJob(text, bias, primingSequence, primingText) {
@@ -69,7 +72,6 @@ class HandwritingGenerationExecutor {
   }
 
   abort() {
-    console.log('Aborting...')
     worker.postMessage({
       event: "abort",
       params: []
@@ -100,7 +102,6 @@ class HandwritingGenerationExecutor {
     eventSubscribers.splice(index, 1);
   }
 }
-
 
 let worker = new Worker(new URL("./worker_manager.js", import.meta.url));
 let canvasConfig = new CanvasConfiguration();
@@ -210,6 +211,7 @@ class HandwritingScreen extends React.Component {
       scale: 1,
       points: [],
       text: "",
+      error: "",
       done: true,
       operationStatus: "ready",
       bias: 0.5,
@@ -235,6 +237,7 @@ class HandwritingScreen extends React.Component {
     this.onProgressListener = null;
     this.onCompleteListener = null;
     this.onAbortedListener = null;
+    this.onErrorListener = null;
   }
 
   componentDidMount() {
@@ -245,13 +248,18 @@ class HandwritingScreen extends React.Component {
     };
 
     this.onAbortedListener = () => {
-
-      console.log('Aborted!')
       this.setState({points: [], done: true, progress: 0, operationStatus: "ready"});
     }
 
+    this.onErrorListener = errorEvent => {
+      let message = "Something went wrong. Please, try again.";
+      console.error(errorEvent);
+      this.setState({done: true, progress: 0, operationStatus: "ready", error: message});
+    };
+
     executor.subscribe("resultsReady", this.onCompleteListener);
     executor.subscribe("aborted", this.onAbortedListener);
+    executor.subscribe("error", this.onErrorListener);
   }
 
   handleCompletion() {
@@ -270,6 +278,7 @@ class HandwritingScreen extends React.Component {
 
     executor.unsubscribe("resultsReady", this.onCompleteListener);
     executor.unsubscribe("aborted", this.onAbortedListener);
+    executor.unsubscribe("error", this.onErrorListener);
   }
 
   adjustCanvasSize() {
@@ -278,6 +287,7 @@ class HandwritingScreen extends React.Component {
 
   handleClick() {
     if (this.state.done) {
+      this.setState({error: ""});
       this.runNewJob();
       return;
     }
@@ -383,7 +393,7 @@ class HandwritingScreen extends React.Component {
         buttonText = "Abort";
         disableButton = true;
       } else {
-        console.error("Unhandled case");
+        console.error("Unknown status");
       }
     }
 
@@ -409,6 +419,12 @@ class HandwritingScreen extends React.Component {
               </Button>
             </Col>
           </Row>
+
+          {this.state.error && 
+            <Row className="mb-2">
+              <Col><Alert variant="danger">{this.state.error}</Alert></Col>
+            </Row>
+          }
 
           {!this.state.done && <InProgressPanel />}
           {this.state.done &&
@@ -444,7 +460,7 @@ class MyCanvas extends React.Component {
 
   componentDidMount() {
     console.log('canvas mounted')
-    //window.addEventListener('resize', this.adjustCanvasSize);
+
     let canvas = this.canvasRef.current;
     this.writer = new CanvasDrawer(canvas, 5, '#fff', '#000');
     this.virtualCanvas = this.makeVirtualCanvas();
@@ -478,7 +494,7 @@ class MyCanvas extends React.Component {
   }
 
   componentWillUnMount() {
-    console.log('canvas will be mounted')
+    console.log('canvas will be unmounted')
     executor.unsubscribe("start", this.onStartListener);
     executor.unsubscribe("progressChanged", this.onProgressListener);
   }
@@ -507,10 +523,11 @@ class MyCanvas extends React.Component {
         if (canvas.height < virtualCanvas.getHeight()) {
           canvas.height = virtualCanvas.getHeight() * 1.25;
         }
-
-        this.updateVisibleSize();
-        this.redrawCanvas();
       }
+
+      // todo: this is way too many updates (avoid the need to recalculate coordinates to have minx=0 and miny=0)
+      this.updateVisibleSize();
+      this.redrawCanvas();
     }
 
     // todo: floating/dynamic scaling factor ()

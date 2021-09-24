@@ -23,4 +23,10 @@ onmessage = function(e) {
         worker = null;
         self.postMessage({event: "aborted"})
     }
+
+}
+
+onerror = function(e) {
+    //propagate any error raised in spawned worker
+    throw e;
 }
