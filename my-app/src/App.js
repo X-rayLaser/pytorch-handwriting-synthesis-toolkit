@@ -125,7 +125,7 @@ export default function App() {
 class VirtualCanvas {
   //the idea is to scale down all coordinates and then calculate the canvas size which will be smaller
   //thus performance should go up
-  constructor(onArrival, onGeometryChange, scaleFactor=1) {
+  constructor(onArrival, onGeometryChange, onGeometryError, scaleFactor=1) {
     this.buffer = [];
     this.lastChunk = [];
     this.scale = scaleFactor;
@@ -136,9 +136,9 @@ class VirtualCanvas {
 
     this.onArrival = onArrival;
     this.onGeometryChange = onGeometryChange;
+    this.onGeometryError = onGeometryError;
 
-    this.MAX_WIDTH = 10000;
-    this.MAX_HEIGHT = 4000;
+    this.MAX_AREA = 10000 * 1000;
   }
   
   addChunk(points) {
@@ -153,8 +153,8 @@ class VirtualCanvas {
     let newMaxY = Math.max(this.maxY, ...scaledY);
 
     if (newMinX !== this.minX || newMinY !== this.minY || newMaxX !== this.maxX || newMaxY !== this.maxY) {
-      if (this.getWidth() > this.MAX_WIDTH || this.getHeight() > this.MAX_HEIGHT) {
-        throw "Exceeded maximum size";
+      if (this.getWidth() * this.getHeight() > this.MAX_AREA) {
+        this.onGeometryError(`Canvas area exceeded maximum value ${this.MAX_AREA}`);
       }
       this.onGeometryChange(this);
     }
@@ -179,11 +179,11 @@ class VirtualCanvas {
   }
 
   getPoints() {
-    return this.zeroOffset(this.buffer);
+    return this.buffer;
   }
 
   getLastChunk() {
-    return this.zeroOffset(this.lastChunk);
+    return this.lastChunk;
   }
 
   zeroOffset(points) {
@@ -433,7 +433,7 @@ class HandwritingScreen extends React.Component {
           }
         </Container>
         <div style={{ overflow: 'auto'}}>
-          <MyCanvas scale={this.state.scale} />
+          <MyCanvas scale={this.state.scale} onError={message => this.setState({done: true, operationStatus: "ready", error: message})} />
         </div>
       </div>
     );
@@ -448,6 +448,9 @@ class MyCanvas extends React.Component {
     this.INITIAL_WIDTH = window.innerWidth / 2;
     this.INITIAL_HEIGHT = window.innerHeight / 8;
     this.RESOLUTION = 0.25;
+
+    this.paddingLeft = 0;
+    this.paddingTop = 0;
 
     this.canvasRef = React.createRef();
     this.writer = null;
@@ -514,24 +517,37 @@ class MyCanvas extends React.Component {
 
       let context = canvas.getContext('2d');
 
-      if (canvas.width < virtualCanvas.getWidth() || canvas.height < virtualCanvas.getHeight()) {
-        context.clearRect(0, 0, canvas.width, canvas.height);
-        if (canvas.width < virtualCanvas.getWidth()) {
-          canvas.width = virtualCanvas.getWidth() * 1.5;
-        }
+      if (virtualCanvas.minX + this.paddingLeft < 0 || virtualCanvas.minY + this.paddingTop < 0) {
+        this.paddingLeft = Math.abs(virtualCanvas.minX) * 1.25;
+        this.paddingTop = Math.abs(virtualCanvas.minY) * 1.25;
 
-        if (canvas.height < virtualCanvas.getHeight()) {
-          canvas.height = virtualCanvas.getHeight() * 1.25;
-        }
+        this.updateVisibleSize();
+        this.redrawCanvas();
       }
+      
+      if (canvas.width < virtualCanvas.getWidth() + this.paddingLeft 
+          || canvas.height < virtualCanvas.getHeight() + this.paddingTop) {
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        if (canvas.width < virtualCanvas.getWidth() + this.paddingLeft) {
+          canvas.width = (virtualCanvas.getWidth() + this.paddingLeft) * 1.5;
+        }
 
-      // todo: this is way too many updates (avoid the need to recalculate coordinates to have minx=0 and miny=0)
-      this.updateVisibleSize();
-      this.redrawCanvas();
+        if (canvas.height < virtualCanvas.getHeight() + this.paddingTop) {
+          canvas.height = (virtualCanvas.getHeight() + this.paddingTop) * 1.25;
+        }
+
+        this.updateVisibleSize();
+        this.redrawCanvas();
+      }
+    }
+
+    const onGeometryError = message => {
+      this.props.onError(message);
+      executor.abort();
     }
 
     // todo: floating/dynamic scaling factor ()
-    return new VirtualCanvas(onArrival, onGeometryChange, this.RESOLUTION);
+    return new VirtualCanvas(onArrival, onGeometryChange, onGeometryError, this.RESOLUTION);
   }
 
   updateVisibleSize() {
@@ -556,6 +572,7 @@ class MyCanvas extends React.Component {
 
     let points = this.virtualCanvas.getPoints();
 
+    this.writer.setPadding(this.paddingLeft, this.paddingTop);
     this.writer.setWidth(lineWidth);
     this.writer.reset();
     this.writer.draw(points);

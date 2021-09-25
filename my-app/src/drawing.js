@@ -1,9 +1,11 @@
 export default class CanvasDrawer {
-    constructor(canvas, lineWidth, background, strokeColor) {
+    constructor(canvas, lineWidth, background, strokeColor, paddingLeft=0, paddingTop=0) {
       this.wasEos = false;
       this.canvas = canvas;
       this.background = background;
       this.strokeColor = strokeColor;
+      this.paddingLeft = paddingLeft;
+      this.paddingTop = paddingTop;
 
       this.context = canvas.getContext('2d');
       this.context.clearRect(0, 0, canvas.width, canvas.height);
@@ -20,11 +22,14 @@ export default class CanvasDrawer {
       const ctx = this.context;
   
       points.forEach(p => {
+        let x = p.x + this.paddingLeft;
+        let y = p.y + this.paddingTop;
+
         if (this.wasEos) {
-          ctx.moveTo(p.x, p.y);
+          ctx.moveTo(x, y);
           this.wasEos = false;
         } else {
-          ctx.lineTo(p.x, p.y);
+          ctx.lineTo(x, y);
         }
   
         if (p.eos == 1) {
@@ -58,5 +63,10 @@ export default class CanvasDrawer {
 
     setLineColor(color) {
       this.strokeColor = color;
+    }
+
+    setPadding(paddingLeft, paddingTop) {
+      this.paddingLeft  = paddingLeft;
+      this.paddingTop = paddingTop;
     }
 }
