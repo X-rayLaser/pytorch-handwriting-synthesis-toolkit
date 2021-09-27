@@ -2,12 +2,14 @@ import './App.css';
 import React from 'react';
 import Button from 'react-bootstrap/Button';
 import ButtonGroup from 'react-bootstrap/ButtonGroup';
+import Dropdown from 'react-bootstrap/Dropdown';
 import Alert from 'react-bootstrap/Alert';
 import ProgressBar from 'react-bootstrap/ProgressBar';
 import Container from 'react-bootstrap/Container';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Form from 'react-bootstrap/Form';
+import { InputGroup } from 'react-bootstrap';
 import Accordion from 'react-bootstrap/Accordion';
 import { SketchPicker } from 'react-color';
 import CanvasDrawer from './drawing';
@@ -213,6 +215,7 @@ class HandwritingScreen extends React.Component {
       text: "",
       error: "",
       done: true,
+      showZoomButtons: false,
       operationStatus: "ready",
       bias: 0.5,
       showBackgroundPicker: false,
@@ -232,6 +235,7 @@ class HandwritingScreen extends React.Component {
     this.handleChangeBackground = this.handleChangeBackground.bind(this);
     this.handleChangeStrokeColor = this.handleChangeStrokeColor.bind(this);
     this.handleBiasChange = this.handleBiasChange.bind(this);
+    this.handleCanvasError = this.handleCanvasError.bind(this);
     this.adjustCanvasSize = this.adjustCanvasSize.bind(this);
 
     this.onProgressListener = null;
@@ -263,7 +267,7 @@ class HandwritingScreen extends React.Component {
   }
 
   handleCompletion() {
-    this.setState({points: [], done: true, progress: 0});
+    this.setState({showZoomButtons: true, done: true, progress: 0});
   }
 
   componentDidUpdate() {
@@ -287,7 +291,7 @@ class HandwritingScreen extends React.Component {
 
   handleClick() {
     if (this.state.done) {
-      this.setState({error: ""});
+      this.setState({error: "", showZoomButtons: false});
       this.runNewJob();
       return;
     }
@@ -372,6 +376,12 @@ class HandwritingScreen extends React.Component {
     this.setState({strokeColor: color.hex});
     canvasConfig.update(this.state.background, color.hex);
   }
+
+  handleCanvasError(message) {
+    this.setState({operationStatus: "halting", error: message});
+    executor.abort();
+  }
+
   render() {
     let disableButton;
     let buttonText;
@@ -400,11 +410,14 @@ class HandwritingScreen extends React.Component {
     return (
       <div className="App">
         <Container>
-          
-          <textarea className="mb-2" placeholder="Enter text to generate a handwriting for" 
-                    value={this.state.text} onChange={this.handleChange} maxLength="99">
-
-          </textarea>
+          <Form className="mb-2">
+            <InputGroup className="mb-3">
+              <InputGroup.Text id="text-addon">Text</InputGroup.Text>
+              <Form.Control type="text" placeholder="Enter a text to generate a handwriting for (no longer than 50 characters)" 
+                            value={this.state.text} onChange={this.handleChange} maxLength="50"
+                            aria-label="Text used for handwriting synthesis" aria-describedby="text-addon" />
+            </InputGroup>
+          </Form>
           <SettingsPanel bias={this.state.bias} primingText={this.state.primingText}
                          onChangeBackground={this.handleChangeBackground} 
                          onChangeStrokeColor={this.handleChangeStrokeColor}
@@ -412,7 +425,7 @@ class HandwritingScreen extends React.Component {
                          onPrimingTextChange={e => this.setState({primingText: e.target.value})}
                          onPrimingSequenceChange={points => this.setState({primingSequence: points})}
                           />
-          <Row className="mb-2">
+          <Row className="mb-2 text-center">
             <Col>
               <Button onClick={this.handleClick} disabled={disableButton}>
                 {buttonText}
@@ -427,13 +440,13 @@ class HandwritingScreen extends React.Component {
           }
 
           {!this.state.done && <InProgressPanel />}
-          {this.state.done &&
+          {this.state.done && this.state.showZoomButtons &&
             <ZoomButtonsGroup onZoomIn={this.handleZoomIn} onZoomOut={this.handleZoomOut} 
                               canZoomIn={this.canZoomIn()} canZoomOut={this.canZoomOut()} />
           }
         </Container>
         <div style={{ overflow: 'auto'}}>
-          <MyCanvas scale={this.state.scale} onError={message => this.setState({done: true, operationStatus: "ready", error: message})} />
+          <MyCanvas scale={this.state.scale} onError={this.handleCanvasError} />
         </div>
       </div>
     );
@@ -447,7 +460,7 @@ class MyCanvas extends React.Component {
 
     this.INITIAL_WIDTH = window.innerWidth / 2;
     this.INITIAL_HEIGHT = window.innerHeight / 8;
-    this.RESOLUTION = 0.25;
+    this.RESOLUTION = 0.5;
 
     this.paddingLeft = 0;
     this.paddingTop = 0;
@@ -469,10 +482,8 @@ class MyCanvas extends React.Component {
     this.virtualCanvas = this.makeVirtualCanvas();
 
     this.onStartListener = () => {
-      console.log("on Start!")
       canvas.width = this.INITIAL_WIDTH;
       canvas.height = this.INITIAL_HEIGHT;
-      console.log(canvas.height);
       
       this.updateVisibleSize();
 
@@ -543,7 +554,6 @@ class MyCanvas extends React.Component {
 
     const onGeometryError = message => {
       this.props.onError(message);
-      executor.abort();
     }
 
     // todo: floating/dynamic scaling factor ()
@@ -639,26 +649,29 @@ class SettingsPanel extends React.Component {
           <Accordion.Header>Settings</Accordion.Header>
           <Accordion.Body>
             <Form>
-              <Row className="align-items-center mb-2">
-
-                <Col xs="auto" style={{margin: 'auto'}}>
-                  <Form.Label htmlFor="inlineFormInput">
-                    Bias
-                  </Form.Label>
-                    <Form.Control type="number" id="inlineFormInput"
-                                  value={this.props.bias} min={0} max={100} step={0.1} 
-                                  onChange={e => this.props.onBiasChange(e)} />
-                  </Col>
-              </Row>
+              <Form.Group className="mb-3" controlId="formBasicEmail">
+                <InputGroup className="mb-3">
+                  <InputGroup.Text id="bias-addon">Bias</InputGroup.Text>
+                    <Form.Control type="number" value={this.props.bias} min={0} max={100} step={0.1} 
+                      onChange={e => this.props.onBiasChange(e)}
+                      placeholder="Bias"
+                      aria-label="Bias"
+                      aria-describedby="bias-addon"
+                    />
+                </InputGroup>
+                <Form.Text className="text-muted">
+                  Higher values result in a cleaner, nicer looking handwriting, while lower values result in less readable but more diverse samples
+                </Form.Text>
+              </Form.Group>
               <MyColorPicker label='Background color' onChangeComplete={e => this.props.onChangeBackground(e) } />
-              <MyColorPicker label='Stoke color' onChangeComplete={e => this.props.onChangeStrokeColor(e) } />
+              <MyColorPicker label='Handwriting color' onChangeComplete={e => this.props.onChangeStrokeColor(e) } />
             </Form>
           </Accordion.Body>
         </Accordion.Item>
         <Accordion.Item eventKey="1">
           <Accordion.Header ref={this.itemRef}>Custom style</Accordion.Header>
           <Accordion.Body ref={this.bodyRef}>
-            <p>Priming is a easy and fast way to make a synthesis network adapt to your style of writing.
+            <p>Priming is an easy and fast way to make a synthesis network adapt to your style of writing.
               You only need to provide an arbitrary piece of text and a corresponding handwriting. You can enter a 
               text into a text field below. Then, you need to create a handwritten version of the text by writing on a canvas.
             </p>
@@ -696,34 +709,22 @@ class MyColorPicker extends React.Component {
   }
   render() {
     let label = this.props.label || 'Color';
-    let buttonText;
-    if (this.state.show) {
-      buttonText = 'Close picker';
-    } else {
-      buttonText = 'Choose a color';
-    }
 
     return (
-      <Row className="mb-2">
-        <Col>
-          <Form.Label className="mr-2">{label}:</Form.Label>
-          <FilledSquare color={this.state.color} />
-          <Button onClick={this.toggleShow}>
-            {buttonText}
-          </Button>
+      <Form.Group as={Row}>
+        <Col xs={2}>
+          <Form.Label htmlFor="exampleColorInput">{label}</Form.Label>
         </Col>
-        {this.state.show &&
-          <Col>
-            <div style={{width: 'auto'}}>
-              <SketchPicker
-                style={{margin:'auto'}}
-                color={ this.state.color }
-                onChangeComplete={ this.handleChange }
-              />
-            </div>
-          </Col>
-        }
-      </Row>
+      <Col xs={1}>
+      <Form.Control
+        type="color"
+        id="exampleColorInput"
+        defaultValue={this.state.color}
+        title="Choose background color"
+        onChange={e => this.handleChange({hex: e.target.value})}
+      />
+      </Col>
+      </Form.Group>
     );
   }
 }
@@ -732,7 +733,9 @@ class MyColorPicker extends React.Component {
 function FilledSquare(props) {
   let size = props.size || 25;
   return (
-    <div style={{width: `${size}px`, height: `${size}px`, background: props.color, display: 'inline-block'}}>
+    <div style={{
+      width: `${size}px`, height: `${size}px`, margin: '0 20px', background: props.color, display: 'inline-block'}
+    }>
     </div>
   );
 }
@@ -784,7 +787,7 @@ class InProgressPanel extends React.Component {
 
 function ZoomButtonsGroup(props) {
   return (
-    <Row className="mb-2">
+    <Row className="mb-2 text-center">
       <Col>
         <ButtonGroup size="sm">
           <Button variant="secondary" onClick={e => props.onZoomIn(e)} disabled={!props.canZoomIn}>

@@ -25,7 +25,7 @@ onmessage = function(e) {
         generateHandwriting(text, bias, onProgress).then(results => {
             self.postMessage({event: "resultsReady", results: results});
         }).catch(reason => {
-            throw `Error when generating handwriting with priming: ${reason}`;
+            throw `Error when generating handwriting: ${reason}`;
         });
     }
 }

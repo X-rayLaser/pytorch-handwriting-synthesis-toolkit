@@ -22,8 +22,8 @@ export default class CanvasDrawer {
       const ctx = this.context;
   
       points.forEach(p => {
-        let x = p.x + this.paddingLeft;
-        let y = p.y + this.paddingTop;
+        let x = Math.round(p.x + this.paddingLeft);
+        let y = Math.round(p.y + this.paddingTop);
 
         if (this.wasEos) {
           ctx.moveTo(x, y);
