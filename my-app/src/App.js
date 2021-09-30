@@ -308,7 +308,7 @@ class HandwritingScreen extends React.Component {
       return;
     }
 
-    if (this.state.text.length >= 100) {
+    if (this.state.text.length >= 200) {
       window.alert("Text must contain fewer thatn 100 characters. Please, try again.");
       return;
     }
@@ -414,7 +414,7 @@ class HandwritingScreen extends React.Component {
             <InputGroup className="mb-3">
               <InputGroup.Text id="text-addon">Text</InputGroup.Text>
               <Form.Control type="text" placeholder="Enter a text to generate a handwriting for (no longer than 50 characters)" 
-                            value={this.state.text} onChange={this.handleChange} maxLength="50"
+                            value={this.state.text} onChange={this.handleChange} maxLength="150"
                             aria-label="Text used for handwriting synthesis" aria-describedby="text-addon" />
             </InputGroup>
           </Form>
@@ -445,9 +445,7 @@ class HandwritingScreen extends React.Component {
                               canZoomIn={this.canZoomIn()} canZoomOut={this.canZoomOut()} />
           }
         </Container>
-        <div style={{ overflow: 'auto'}}>
-          <MyCanvas scale={this.state.scale} onError={this.handleCanvasError} />
-        </div>
+        <MyCanvas scale={this.state.scale} onError={this.handleCanvasError} />
       </div>
     );
   }
@@ -458,37 +456,63 @@ class MyCanvas extends React.Component {
   constructor(props) {
     super(props);
 
-    this.INITIAL_WIDTH = window.innerWidth / 2;
-    this.INITIAL_HEIGHT = window.innerHeight / 8;
+    this.state = {
+      scrollLeft: 0,
+      scrollTop: 0
+    };
+
+    this.VIEW_PORT_WIDTH = window.innerWidth - 15;
+    this.VEIW_PORT_HEIGHT = 400;
+
+    this.CANVAS_WIDTH = 10000;
+    this.CANVAS_HEIGHT = 1000;
+
+    this.AUTOSCROLL_PIXELS = Math.round(this.VIEW_PORT_WIDTH / 2);
+
     this.RESOLUTION = 0.5;
 
     this.paddingLeft = 0;
     this.paddingTop = 0;
 
+    this.containerRef = React.createRef();
     this.canvasRef = React.createRef();
+
     this.writer = null;
     this.virtualCanvas = null;
 
     this.onStartListener = null;
     this.onProgressListener = null;
     this.onConfigChangeListener = null;
+    this.onScrollListener = null;
   }
 
   componentDidMount() {
     console.log('canvas mounted')
+
+    let containerDiv = this.containerRef.current;
+
+    this.onScrollListener = e => {
+      this.setState({
+        scrollLeft: containerDiv.scrollLeft,
+        scrollTop: containerDiv.scrollTop
+      });
+    };
+
+    containerDiv.addEventListener('scroll', this.onScrollListener);
 
     let canvas = this.canvasRef.current;
     this.writer = new CanvasDrawer(canvas, 5, '#fff', '#000');
     this.virtualCanvas = this.makeVirtualCanvas();
 
     this.onStartListener = () => {
-      canvas.width = this.INITIAL_WIDTH;
-      canvas.height = this.INITIAL_HEIGHT;
-      
-      this.updateVisibleSize();
-
+      canvas.width = this.VIEW_PORT_WIDTH;
+      canvas.height = this.VEIW_PORT_HEIGHT;
       this.virtualCanvas.reset();
       this.writer.reset();
+
+      containerDiv.scrollLeft = 0;
+      containerDiv.scrollTop = 0; 
+      this.setState({scrollLeft: 0, scrollTop: 0});
     };
 
     this.onProgressListener = (points, progress) => {
@@ -511,45 +535,46 @@ class MyCanvas extends React.Component {
     console.log('canvas will be unmounted')
     executor.unsubscribe("start", this.onStartListener);
     executor.unsubscribe("progressChanged", this.onProgressListener);
+
+    this.containerRef.current.removeEventListener('scroll', this.onScrollListener);
   }
 
   componentDidUpdate() {
     console.log('Did update mycanvas !!!');
+    this.redrawCanvas();
   }
 
   makeVirtualCanvas() {
     const onArrival = virtualCanvas => {
-      this.writer.draw(virtualCanvas.getLastChunk());
+      let points = this.toViewPortPoints(virtualCanvas.getLastChunk());
+      this.writer.draw(points);
       this.writer.finish();
     }
 
     const onGeometryChange = virtualCanvas => {
-      let canvas = this.canvasRef.current;
-
-      let context = canvas.getContext('2d');
-
       if (virtualCanvas.minX + this.paddingLeft < 0 || virtualCanvas.minY + this.paddingTop < 0) {
         this.paddingLeft = Math.abs(virtualCanvas.minX) * 1.25;
         this.paddingTop = Math.abs(virtualCanvas.minY) * 1.25;
-
-        this.updateVisibleSize();
         this.redrawCanvas();
       }
-      
-      if (canvas.width < virtualCanvas.getWidth() + this.paddingLeft 
-          || canvas.height < virtualCanvas.getHeight() + this.paddingTop) {
-        context.clearRect(0, 0, canvas.width, canvas.height);
-        if (canvas.width < virtualCanvas.getWidth() + this.paddingLeft) {
-          canvas.width = (virtualCanvas.getWidth() + this.paddingLeft) * 1.5;
+
+      let maxX = virtualCanvas.maxX + this.paddingLeft;
+
+      let containerDiv = this.containerRef.current;
+
+      if (maxX + this.paddingLeft > this.state.scrollLeft + this.VIEW_PORT_WIDTH) {
+        if (maxX < this.VIEW_PORT_WIDTH) {
+          containerDiv.scrollLeft = 0;
+        } else {
+          containerDiv.scrollLeft = maxX - this.VIEW_PORT_WIDTH + this.AUTOSCROLL_PIXELS;
         }
 
-        if (canvas.height < virtualCanvas.getHeight() + this.paddingTop) {
-          canvas.height = (virtualCanvas.getHeight() + this.paddingTop) * 1.25;
-        }
-
-        this.updateVisibleSize();
-        this.redrawCanvas();
+        this.setState({
+          scrollLeft: containerDiv.scrollLeft
+        });
       }
+
+      //this.resizeCanvas(canvas);
     }
 
     const onGeometryError = message => {
@@ -560,16 +585,21 @@ class MyCanvas extends React.Component {
     return new VirtualCanvas(onArrival, onGeometryChange, onGeometryError, this.RESOLUTION);
   }
 
-  updateVisibleSize() {
-    let canvas = this.canvasRef.current;
-    let scaledWidth = window.innerWidth * this.props.scale;
-    let aspectRatio = canvas.width / canvas.height;
-    let canvasHeight = Math.round(scaledWidth / aspectRatio);
-    let canvasWidth = Math.round(scaledWidth);
+  resizeCanvas(canvas) {
+    if (canvas.width < virtualCanvas.getWidth() + this.paddingLeft 
+        || canvas.height < virtualCanvas.getHeight() + this.paddingTop) {
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      if (canvas.width < virtualCanvas.getWidth() + this.paddingLeft) {
+        canvas.width = (virtualCanvas.getWidth() + this.paddingLeft) * 1.5;
+      }
 
-    canvas.setAttribute("style", `width:${canvasWidth}px;height:${canvasHeight}px`);
-    canvas.style.width = `${canvasWidth}px`;
-    canvas.style.height = `${canvasHeight}px`;
+      if (canvas.height < virtualCanvas.getHeight() + this.paddingTop) {
+        canvas.height = (virtualCanvas.getHeight() + this.paddingTop) * 1.25;
+      }
+
+      this.updateVisibleSize();
+      this.redrawCanvas();
+    }
   }
 
   redrawCanvas() {
@@ -580,7 +610,7 @@ class MyCanvas extends React.Component {
     let scaledWidth = window.innerWidth * this.props.scale;
     let lineWidth = Math.floor(canvas.width / scaledWidth) + minWidth;
 
-    let points = this.virtualCanvas.getPoints();
+    let points = this.toViewPortPoints(this.virtualCanvas.getPoints());
 
     this.writer.setPadding(this.paddingLeft, this.paddingTop);
     this.writer.setWidth(lineWidth);
@@ -588,26 +618,42 @@ class MyCanvas extends React.Component {
     this.writer.draw(points);
     this.writer.finish();
   }
-
-  getAspectRatio() {
-    let canvas = this.canvasRef.current;
-    if (canvas) {
-      return canvas.width / canvas.height;
-    }
-    return this.INITIAL_WIDTH / this.INITIAL_HEIGHT;
+  
+  toViewPortPoints(points) {
+    let scrollLeft = this.state.scrollLeft;
+    let scrollTop = this.state.scrollTop;
+    return points.map(p => ({x: p.x - scrollLeft + this.paddingLeft, y: p.y - scrollTop + this.paddingTop, eos: p.eos}));
   }
+
   render() {
-    let scaledWidth = window.innerWidth * this.props.scale;
-    let canvasHeight = Math.round(scaledWidth / this.getAspectRatio());
-    let canvasWidth = Math.round(scaledWidth);
-
     return (
-      <canvas ref={this.canvasRef} width={this.INITIAL_WIDTH} height={this.INITIAL_HEIGHT} 
-              style={{ width: `${canvasWidth}px`, height: `${canvasHeight}px`}} >
+      <OverlayContainer width={this.VIEW_PORT_WIDTH} height={this.VEIW_PORT_HEIGHT}>
+        <div ref={this.containerRef} style={{position: 'absolute', width: this.VIEW_PORT_WIDTH, height: this.VEIW_PORT_HEIGHT, top:0, left:0, overflow: 'auto'}}>
+          <div style={{width: this.CANVAS_WIDTH, height: this.CANVAS_HEIGHT}}></div>
+        </div>
+        <canvas ref={this.canvasRef} width={this.VIEW_PORT_WIDTH} height={this.VEIW_PORT_HEIGHT} 
+                style={{ position: 'absolute', width: `${this.VIEW_PORT_WIDTH}px`, height: `${this.VEIW_PORT_HEIGHT}px`, left: 0, top: 0, zIndex: -1}} >
 
-      </canvas>
+        </canvas>
+      </OverlayContainer>
     );
   }
+}
+
+function OverlayContainer(props) {
+  return (
+    <div style={{position:'relative', width: props.width, height: props.height}}>
+      {props.children}
+    </div>
+  );
+}
+
+function Placeholder(props) {
+  return (
+    <div ref={this.containerRef} style={{position: 'absolute', width: this.VIEW_PORT_WIDTH, height: this.VEIW_PORT_HEIGHT, top:0, left:0, overflow: 'auto'}}>
+      <div style={{width: this.CANVAS_WIDTH, height: this.CANVAS_HEIGHT}}></div>
+    </div>
+  );
 }
 
 
