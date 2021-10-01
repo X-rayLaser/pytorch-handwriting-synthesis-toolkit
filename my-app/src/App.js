@@ -200,6 +200,25 @@ class VirtualCanvas {
     this.maxX = 0;
     this.maxY = 0;
   }
+
+  reScale(scale) {
+    //undo previous scaling and apply new scale to every point
+
+    const update = z => z / this.scale * scale;
+
+    const mapPoint = p => ({
+      x: update(p.x),
+      y: update(p.y),
+      eos: p.eos
+    });
+
+    this.buffer = this.buffer.map(mapPoint);
+    this.minX = update(this.minX);
+    this.minY = update(this.minY);
+    this.maxX = update(this.maxX);
+    this.maxY = update(this.maxY);
+    this.scale = scale;
+  }
 }
 
 
@@ -320,22 +339,22 @@ class HandwritingScreen extends React.Component {
 
   handleZoomIn() {
     if (this.canZoomIn()) {
-      this.setState((state, cb) => ({scale: state.scale * 2}));
+      this.setState((state, cb) => ({scale: state.scale * 1.5}));
     }
   }
 
   handleZoomOut() {
     if (this.canZoomOut()) {
-      this.setState((state, cb) => ({scale: state.scale / 2}));
+      this.setState((state, cb) => ({scale: state.scale / 1.5}));
     }
   }
 
   canZoomIn() {
-    return this.state.scale < 10;
+    return this.state.scale < 3;
   }
 
   canZoomOut() {
-    return this.state.scale > 0.1;
+    return this.state.scale > 1 / 3.;
   }
 
   isScaleWithinBounds() {
@@ -410,7 +429,7 @@ class HandwritingScreen extends React.Component {
     return (
       <div className="App">
         <Container>
-          <Form className="mb-2">
+          <Form className="mb-2" onSubmit={e => e.preventDefault()}>
             <InputGroup className="mb-3">
               <InputGroup.Text id="text-addon">Text</InputGroup.Text>
               <Form.Control type="text" placeholder="Enter a text to generate a handwriting for (no longer than 50 characters)" 
@@ -465,11 +484,10 @@ class MyCanvas extends React.Component {
     this.VEIW_PORT_HEIGHT = 400;
 
     this.CANVAS_WIDTH = 10000;
-    this.CANVAS_HEIGHT = 1000;
-
+    this.CANVAS_HEIGHT = 1500;
+    this.LINE_WIDTH = 4;
+  
     this.AUTOSCROLL_PIXELS = Math.round(this.VIEW_PORT_WIDTH / 2);
-
-    this.RESOLUTION = 0.5;
 
     this.paddingLeft = 0;
     this.paddingTop = 0;
@@ -511,7 +529,9 @@ class MyCanvas extends React.Component {
       this.writer.reset();
 
       containerDiv.scrollLeft = 0;
-      containerDiv.scrollTop = 0; 
+      containerDiv.scrollTop = 0;
+      this.paddingLeft = 0;
+      this.paddingTop = 0;
       this.setState({scrollLeft: 0, scrollTop: 0});
     };
 
@@ -541,6 +561,10 @@ class MyCanvas extends React.Component {
 
   componentDidUpdate() {
     console.log('Did update mycanvas !!!');
+    let effectiveScale = this.effectiveScale();
+    if (effectiveScale !== this.virtualCanvas.scale) {
+      this.virtualCanvas.reScale(effectiveScale);
+    }
     this.redrawCanvas();
   }
 
@@ -581,8 +605,9 @@ class MyCanvas extends React.Component {
       this.props.onError(message);
     }
 
-    // todo: floating/dynamic scaling factor ()
-    return new VirtualCanvas(onArrival, onGeometryChange, onGeometryError, this.RESOLUTION);
+    
+    let effectiveScale = this.effectiveScale();
+    return new VirtualCanvas(onArrival, onGeometryChange, onGeometryError, effectiveScale);
   }
 
   resizeCanvas(canvas) {
@@ -603,22 +628,18 @@ class MyCanvas extends React.Component {
   }
 
   redrawCanvas() {
-    console.log("redrawing")
-    const minWidth = 2;
-
-    let canvas = this.canvasRef.current;
-    let scaledWidth = window.innerWidth * this.props.scale;
-    let lineWidth = Math.floor(canvas.width / scaledWidth) + minWidth;
-
     let points = this.toViewPortPoints(this.virtualCanvas.getPoints());
-
     this.writer.setPadding(this.paddingLeft, this.paddingTop);
-    this.writer.setWidth(lineWidth);
+    this.writer.setWidth(this.LINE_WIDTH);
     this.writer.reset();
     this.writer.draw(points);
     this.writer.finish();
   }
   
+  effectiveScale() {
+    // default scale 1 is too large
+    return this.props.scale / 2;
+  }
   toViewPortPoints(points) {
     let scrollLeft = this.state.scrollLeft;
     let scrollTop = this.state.scrollTop;
@@ -694,7 +715,7 @@ class SettingsPanel extends React.Component {
         <Accordion.Item eventKey="0">
           <Accordion.Header>Settings</Accordion.Header>
           <Accordion.Body>
-            <Form>
+            <Form onSubmit={e => e.preventDefault()}>
               <Form.Group className="mb-3" controlId="formBasicEmail">
                 <InputGroup className="mb-3">
                   <InputGroup.Text id="bias-addon">Bias</InputGroup.Text>
