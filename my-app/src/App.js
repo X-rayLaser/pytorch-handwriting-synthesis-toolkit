@@ -265,7 +265,8 @@ class HandwritingScreen extends React.Component {
 
   componentDidMount() {
     window.addEventListener('resize', this.adjustCanvasSize);
- 
+    window.addEventListener('changeorientation', this.adjustCanvasSize);
+
     this.onCompleteListener = (points) => {
       this.handleCompletion();
     };
@@ -295,6 +296,8 @@ class HandwritingScreen extends React.Component {
 
   componentWillUnmount() {
     window.removeEventListener('resize', this.adjustCanvasSize);
+    window.removeEventListener('changeorientation', this.adjustCanvasSize);
+
     if (this.workerListener) {
       worker.removeEventListener('message', this.workerListener);
     }
@@ -477,17 +480,15 @@ class MyCanvas extends React.Component {
 
     this.state = {
       scrollLeft: 0,
-      scrollTop: 0
+      scrollTop: 0,
+      view_port_width: document.body.clientWidth
     };
 
-    this.VIEW_PORT_WIDTH = window.innerWidth - 15;
     this.VEIW_PORT_HEIGHT = 400;
 
     this.CANVAS_WIDTH = 10000;
     this.CANVAS_HEIGHT = 1500;
     this.LINE_WIDTH = 4;
-  
-    this.AUTOSCROLL_PIXELS = Math.round(this.VIEW_PORT_WIDTH / 2);
 
     this.paddingLeft = 0;
     this.paddingTop = 0;
@@ -502,11 +503,11 @@ class MyCanvas extends React.Component {
     this.onProgressListener = null;
     this.onConfigChangeListener = null;
     this.onScrollListener = null;
+
+    this.onResizeListener = null;
   }
 
   componentDidMount() {
-    console.log('canvas mounted')
-
     let containerDiv = this.containerRef.current;
 
     this.onScrollListener = e => {
@@ -518,12 +519,20 @@ class MyCanvas extends React.Component {
 
     containerDiv.addEventListener('scroll', this.onScrollListener);
 
+    this.onResizeListener = e => {
+      let view_port_width = document.body.clientWidth;
+      this.setState({view_port_width});
+    };
+
+    window.addEventListener("resize", this.onResizeListener);
+    window.addEventListener("orientationchange", this.onResizeListener);
+
     let canvas = this.canvasRef.current;
     this.writer = new CanvasDrawer(canvas, 5, '#fff', '#000');
     this.virtualCanvas = this.makeVirtualCanvas();
 
     this.onStartListener = () => {
-      canvas.width = this.VIEW_PORT_WIDTH;
+      canvas.width = this.state.view_port_width;
       canvas.height = this.VEIW_PORT_HEIGHT;
       this.virtualCanvas.reset();
       this.writer.reset();
@@ -549,18 +558,20 @@ class MyCanvas extends React.Component {
     }
 
     canvasConfig.setListener(this.onConfigChangeListener);
+    this.onResizeListener({});
   }
 
   componentWillUnMount() {
-    console.log('canvas will be unmounted')
     executor.unsubscribe("start", this.onStartListener);
     executor.unsubscribe("progressChanged", this.onProgressListener);
 
     this.containerRef.current.removeEventListener('scroll', this.onScrollListener);
+    
+    window.removeEventListener("resize", this.onResizeListener);
+    window.removeEventListener("orientationchange", this.onResizeListener);
   }
 
   componentDidUpdate() {
-    console.log('Did update mycanvas !!!');
     let effectiveScale = this.effectiveScale();
     if (effectiveScale !== this.virtualCanvas.scale) {
       this.virtualCanvas.reScale(effectiveScale);
@@ -582,23 +593,22 @@ class MyCanvas extends React.Component {
         this.redrawCanvas();
       }
 
+      let AUTOSCROLL_PIXELS = Math.round(this.state.view_port_width / 2);
       let maxX = virtualCanvas.maxX + this.paddingLeft;
 
       let containerDiv = this.containerRef.current;
 
-      if (maxX + this.paddingLeft > this.state.scrollLeft + this.VIEW_PORT_WIDTH) {
-        if (maxX < this.VIEW_PORT_WIDTH) {
+      if (maxX + this.paddingLeft > this.state.scrollLeft + this.state.view_port_width) {
+        if (maxX < this.state.view_port_width) {
           containerDiv.scrollLeft = 0;
         } else {
-          containerDiv.scrollLeft = maxX - this.VIEW_PORT_WIDTH + this.AUTOSCROLL_PIXELS;
+          containerDiv.scrollLeft = maxX - this.state.view_port_width + AUTOSCROLL_PIXELS;
         }
 
         this.setState({
           scrollLeft: containerDiv.scrollLeft
         });
       }
-
-      //this.resizeCanvas(canvas);
     }
 
     const onGeometryError = message => {
@@ -608,23 +618,6 @@ class MyCanvas extends React.Component {
     
     let effectiveScale = this.effectiveScale();
     return new VirtualCanvas(onArrival, onGeometryChange, onGeometryError, effectiveScale);
-  }
-
-  resizeCanvas(canvas) {
-    if (canvas.width < virtualCanvas.getWidth() + this.paddingLeft 
-        || canvas.height < virtualCanvas.getHeight() + this.paddingTop) {
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      if (canvas.width < virtualCanvas.getWidth() + this.paddingLeft) {
-        canvas.width = (virtualCanvas.getWidth() + this.paddingLeft) * 1.5;
-      }
-
-      if (canvas.height < virtualCanvas.getHeight() + this.paddingTop) {
-        canvas.height = (virtualCanvas.getHeight() + this.paddingTop) * 1.25;
-      }
-
-      this.updateVisibleSize();
-      this.redrawCanvas();
-    }
   }
 
   redrawCanvas() {
@@ -648,12 +641,12 @@ class MyCanvas extends React.Component {
 
   render() {
     return (
-      <OverlayContainer width={this.VIEW_PORT_WIDTH} height={this.VEIW_PORT_HEIGHT}>
-        <div ref={this.containerRef} style={{position: 'absolute', width: this.VIEW_PORT_WIDTH, height: this.VEIW_PORT_HEIGHT, top:0, left:0, overflow: 'auto'}}>
+      <OverlayContainer width={this.state.view_port_width} height={this.VEIW_PORT_HEIGHT}>
+        <div ref={this.containerRef} style={{position: 'absolute', width: this.state.view_port_width, height: this.VEIW_PORT_HEIGHT, top:0, left:0, overflow: 'auto'}}>
           <div style={{width: this.CANVAS_WIDTH, height: this.CANVAS_HEIGHT}}></div>
         </div>
-        <canvas ref={this.canvasRef} width={this.VIEW_PORT_WIDTH} height={this.VEIW_PORT_HEIGHT} 
-                style={{ position: 'absolute', width: `${this.VIEW_PORT_WIDTH}px`, height: `${this.VEIW_PORT_HEIGHT}px`, left: 0, top: 0, zIndex: -1}} >
+        <canvas ref={this.canvasRef} width={this.state.view_port_width} height={this.VEIW_PORT_HEIGHT} 
+                style={{ position: 'absolute', width: `${this.state.view_port_width}px`, height: `${this.VEIW_PORT_HEIGHT}px`, left: 0, top: 0, zIndex: -1}} >
 
         </canvas>
       </OverlayContainer>
