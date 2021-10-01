@@ -2,7 +2,6 @@ import './App.css';
 import React from 'react';
 import Button from 'react-bootstrap/Button';
 import ButtonGroup from 'react-bootstrap/ButtonGroup';
-import Dropdown from 'react-bootstrap/Dropdown';
 import Alert from 'react-bootstrap/Alert';
 import ProgressBar from 'react-bootstrap/ProgressBar';
 import Container from 'react-bootstrap/Container';
@@ -11,13 +10,12 @@ import Col from 'react-bootstrap/Col';
 import Form from 'react-bootstrap/Form';
 import { InputGroup } from 'react-bootstrap';
 import Accordion from 'react-bootstrap/Accordion';
-import { SketchPicker } from 'react-color';
 import CanvasDrawer from './drawing';
 import ScalableCanvas from './ScalableCanvas';
 
 
 class CanvasConfiguration {
-  constructor(backgroundColor='#fff', strokeColor='#000') {
+  constructor(backgroundColor='#ffffff', strokeColor='#000000') {
     this.backgroundColor = backgroundColor;
     this.strokeColor = strokeColor;
     this.listener = null;
@@ -237,10 +235,8 @@ class HandwritingScreen extends React.Component {
       showZoomButtons: false,
       operationStatus: "ready",
       bias: 0.5,
-      showBackgroundPicker: false,
-      showStrokeColorPicker: false,
-      background: '#fff',
-      strokeColor: '#000',
+      background: '#ffffff',
+      strokeColor: '#000000',
       primingText: "",
       primingSequence: []
     };
@@ -443,6 +439,8 @@ class HandwritingScreen extends React.Component {
           <SettingsPanel bias={this.state.bias} primingText={this.state.primingText}
                          onChangeBackground={this.handleChangeBackground} 
                          onChangeStrokeColor={this.handleChangeStrokeColor}
+                         backgroundColor={this.state.background}
+                         strokeColor={this.state.strokeColor}
                          onBiasChange={this.handleBiasChange}
                          onPrimingTextChange={e => this.setState({primingText: e.target.value})}
                          onPrimingSequenceChange={points => this.setState({primingSequence: points})}
@@ -662,14 +660,6 @@ function OverlayContainer(props) {
   );
 }
 
-function Placeholder(props) {
-  return (
-    <div ref={this.containerRef} style={{position: 'absolute', width: this.VIEW_PORT_WIDTH, height: this.VEIW_PORT_HEIGHT, top:0, left:0, overflow: 'auto'}}>
-      <div style={{width: this.CANVAS_WIDTH, height: this.CANVAS_HEIGHT}}></div>
-    </div>
-  );
-}
-
 
 class SettingsPanel extends React.Component {
   constructor(props) {
@@ -723,8 +713,8 @@ class SettingsPanel extends React.Component {
                   Higher values result in a cleaner, nicer looking handwriting, while lower values result in less readable but more diverse samples
                 </Form.Text>
               </Form.Group>
-              <MyColorPicker label='Background color' onChangeComplete={e => this.props.onChangeBackground(e) } />
-              <MyColorPicker label='Handwriting color' onChangeComplete={e => this.props.onChangeStrokeColor(e) } />
+              <MyColorPicker label='Background color' color={this.props.backgroundColor} onChangeComplete={e => this.props.onChangeBackground(e) } />
+              <MyColorPicker label='Handwriting color' color={this.props.strokeColor} onChangeComplete={e => this.props.onChangeStrokeColor(e) } />
             </Form>
           </Accordion.Body>
         </Accordion.Item>
@@ -749,24 +739,12 @@ class SettingsPanel extends React.Component {
 class MyColorPicker extends React.Component {
   constructor(props) {
     super(props);
-    this.state = {
-      show: false,
-      color: '#ffffff'
-    };
-
     this.handleChange = this.handleChange.bind(this);
-    this.toggleShow = this.toggleShow.bind(this);
   }
   handleChange(color) {
-    this.setState({color: color.hex});
     this.props.onChangeComplete(color);
   }
 
-  toggleShow(e) {
-    this.setState((state, cb) => ({
-      show: !state.show
-    }));
-  }
   render() {
     let label = this.props.label || 'Color';
 
@@ -779,7 +757,7 @@ class MyColorPicker extends React.Component {
       <Form.Control
         type="color"
         id="exampleColorInput"
-        defaultValue={this.state.color}
+        defaultValue={this.props.color}
         title="Choose background color"
         onChange={e => this.handleChange({hex: e.target.value})}
       />
@@ -787,17 +765,6 @@ class MyColorPicker extends React.Component {
       </Form.Group>
     );
   }
-}
-
-
-function FilledSquare(props) {
-  let size = props.size || 25;
-  return (
-    <div style={{
-      width: `${size}px`, height: `${size}px`, margin: '0 20px', background: props.color, display: 'inline-block'}
-    }>
-    </div>
-  );
 }
 
 
