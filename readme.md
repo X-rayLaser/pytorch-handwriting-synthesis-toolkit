@@ -5,26 +5,52 @@ See the demo [here](https://x-raylaser.github.io/pytorch-handwriting-synthesis-t
 
 # Introduction
 
-This toolkit contains utilities used to replicate some experiments described in Alex Graves's paper 
-[Generating Sequences With Recurrent Neural Networks](https://arxiv.org/abs/1308.0850). Concretely, this repository focuses on handwriting 
-prediction and handwriting synthesis sections.
+This repository contains utilities for doing handwriting prediction and handwriting synthesis with recurrent neural networks. 
+The implementation closely follows Alex Graves's paper 
+[Generating Sequences With Recurrent Neural Networks](https://arxiv.org/abs/1308.0850).
 
-The repository provides a complete working pipeline to take the dataset, train the model and generate samples. 
-One only needs to provide the dataset. Scripts will take care of everything else, including data preprocessing and normalization.
+It provides a complete working pipeline for training models on a custom dataset and sampling from them.
 
-The implementation closely follows the paper, from model architectures to training setup. 
-However, it also provides some customization (such as choosing the batch size, 
-the maximum length of the sequences, etc.).
-In addition, the code can work with a custom dataset.
-
-Pre-trained models for synthesis and prediction are stored, respectively, under checkpoints/ and ucheckpoints/ directories.
+It includes:
+- pre-trained models
+- handwriting sampling and synthesis utilities
+- data preparation utilities
+- training utilities
+- synthesis network architecture
+- prediction network architecture
+- exporting models to ONNX
 
 # Installation
+1. Open the terminal in some directory.
+2. Clone the repository
+```
+git clone https://github.com/X-rayLaser/pytorch-handwriting-synthesis-toolkit.git
+```
 
-After cloning this repository, install its python dependencies:
+3. Change a current working directory
+```
+cd pytorch-handwriting-synthesis-toolkit
+```
+4. Create a virtualenv environment using Python 3
+```
+virtualenv --python='/path/to/python3/executable' venv
+```
+On Linux you can find the path to python3 executable using this command:
+```
+which python3
+```
+5. Activate the virtual environment
+```
+. venv/bin/activate
+```
+6. Install dependencies
 ```
 pip install -r requirements.txt
 ```
+
+# Pretrained models
+
+Pre-trained models for synthesis and prediction are stored, respectively, under checkpoints/ and ucheckpoints/ directories.
 
 # Handwriting synthesis using pre-trained synthesis network
 

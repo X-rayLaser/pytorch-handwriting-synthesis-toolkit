@@ -699,7 +699,7 @@ class SettingsPanel extends React.Component {
           <Accordion.Header>Settings</Accordion.Header>
           <Accordion.Body>
             <Form onSubmit={e => e.preventDefault()}>
-              <Form.Group className="mb-3" controlId="formBasicEmail">
+              <Form.Group className="mb-3" controlId="formBias">
                 <InputGroup className="mb-3">
                   <InputGroup.Text id="bias-addon">Bias</InputGroup.Text>
                     <Form.Control type="number" value={this.props.bias} min={0} max={100} step={0.1} 
@@ -721,9 +721,12 @@ class SettingsPanel extends React.Component {
         <Accordion.Item eventKey="1">
           <Accordion.Header ref={this.itemRef}>Custom style</Accordion.Header>
           <Accordion.Body ref={this.bodyRef}>
-            <p>Priming is an easy and fast way to make a synthesis network adapt to your style of writing.
-              You only need to provide an arbitrary piece of text and a corresponding handwriting. You can enter a 
-              text into a text field below. Then, you need to create a handwritten version of the text by writing on a canvas.
+            <p>
+              Priming is an easy and fast way to make a synthesis network adapt to your style of writing. 
+              You only need to provide a short piece of text and corresponding handwriting. 
+              You can enter a text into a text field below. 
+              Then, you need to create a handwritten version of the text by writing on a canvas. 
+              As soon as you do the steps, the neural network will be able to mimic (to some extent) your style of writing.
             </p>
             <Form.Control type="text" value={this.props.primingText} placeholder="Enter a text used for priming"
                           onChange={e => this.props.onPrimingTextChange(e)} />
@@ -758,7 +761,7 @@ class MyColorPicker extends React.Component {
         type="color"
         id="exampleColorInput"
         defaultValue={this.props.color}
-        title="Choose background color"
+        title="Choose a color"
         onChange={e => this.handleChange({hex: e.target.value})}
       />
       </Col>
