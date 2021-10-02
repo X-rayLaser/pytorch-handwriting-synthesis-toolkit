@@ -326,8 +326,8 @@ class HandwritingScreen extends React.Component {
       return;
     }
 
-    if (this.state.text.length >= 200) {
-      window.alert("Text must contain fewer thatn 100 characters. Please, try again.");
+    if (this.state.text.length > 150) {
+      window.alert("Text must not be longer than 150 characters. Please, try again.");
       return;
     }
     
@@ -431,7 +431,7 @@ class HandwritingScreen extends React.Component {
           <Form className="mb-2" onSubmit={e => e.preventDefault()}>
             <InputGroup className="mb-3">
               <InputGroup.Text id="text-addon">Text</InputGroup.Text>
-              <Form.Control type="text" placeholder="Enter a text to generate a handwriting for (no longer than 50 characters)" 
+              <Form.Control type="text" placeholder="Enter a text to generate a handwriting for" 
                             value={this.state.text} onChange={this.handleChange} maxLength="150"
                             aria-label="Text used for handwriting synthesis" aria-describedby="text-addon" />
             </InputGroup>
