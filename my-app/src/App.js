@@ -35,38 +35,34 @@ class CanvasConfiguration {
 
 class Trottler {
   constructor(interval=0) {
-    this.prevScheduled = Date.now();
-    this.interval = interval;
-    this.schedule = [];
+    this.buffer = [];
+    this.timer = this.createInterval(interval);
   }
 
   trottle(cb, ...args) {
-    let elapsedMilliseconds = Date.now() - this.prevScheduled;
-    let interval = this.interval;
-    if (Date.now() - this.prevScheduled >= interval) {
-      this.prevScheduled = Date.now();
-      cb(...args);
-    } else {
-      this.prevScheduled += interval;
-      let delay = interval - elapsedMilliseconds;
-      let timeout = setTimeout(() => {
-        cb(...args);
-      }, delay);
-      this.schedule.push(timeout);
-    }
+    this.buffer.push({cb, arguments: args})
   }
 
   clearScheduled() {
-    for (let timeout of this.schedule) {
-      clearTimeout(timeout);
-    }
+    this.buffer = [];
+  }
 
-    this.schedule = [];
+  setInterval(interval) {
+    clearInterval(this.timer);
+    this.timer = this.createInterval(interval);
+  }
+
+  createInterval(interval) {
+    return setInterval(() => {
+      if (this.buffer.length > 0) {
+        let event = this.buffer.shift();
+        event.cb(...event.arguments);
+      }
+    }, interval);
   }
 
   reset() {
     this.clearScheduled();
-    this.prevScheduled = Date.now();
   }
 }
 
@@ -97,7 +93,7 @@ class HandwritingGenerationExecutor {
 
   setTrottlingInterval(interval) {
     this.trottler.reset();
-    this.trottler.interval = interval;
+    this.trottler.setInterval(interval);
   }
 
   runNewJob(text, bias, primingSequence, primingText) {
@@ -877,11 +873,12 @@ class InProgressPanel extends React.Component {
     const text = this.props.text || "Generating a handwriting, please wait...";
 
     let letters = null;
+    let minIntensity = 0.025;
 
     if (this.state.phi.length > 0) {
       let maxPhi = Math.max(...this.state.phi);
       letters = this.props.originalText.split("").map((char, index) => {
-        let intensity = this.state.phi[index] / maxPhi;
+        let intensity = Math.max(minIntensity, this.state.phi[index] / maxPhi);
         return (<ColoredLetter key={index} letter={char} color={0} intensity={intensity} />);
       });
     }
@@ -917,7 +914,7 @@ function ColoredLetter(props) {
   let colorId = props.colorId;
   let color = `${colorId}${colorId}${colorId}`;
   return (
-    <span style={{background: '#eef', color, opacity: props.intensity, fontSize: '4rem'}}>{props.letter}</span>
+    <span style={{background: '#fff', color, opacity: props.intensity, fontSize: '4rem'}}>{props.letter}</span>
   );
 }
 
