@@ -11,8 +11,8 @@ onmessage = function(e) {
     const primingSequence = e.data[2];
     const primingText = e.data[3];
 
-    const onProgress = (progress, results) => {
-        self.postMessage({event: "progressChanged", value: progress, results: results});
+    const onProgress = (progress, results, phi) => {
+        self.postMessage({event: "progressChanged", value: progress, results, phi});
     };
 
     if (primingSequence.length > 0 && primingText.length > 0) {

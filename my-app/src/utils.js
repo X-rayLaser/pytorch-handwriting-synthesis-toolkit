@@ -271,7 +271,7 @@ async function generate(initialFeeds, normalizationParams, bias, onProgress, upd
       let fromIndex = Math.max(0, stepsComplete - updateInterval);
       let toIndex = stepsComplete;
       currentBatch = outputs.slice(fromIndex, toIndex);
-      onProgress(Math.round(i / steps * 100), currentBatch);
+      onProgress(Math.round(i / steps * 100), currentBatch, results.phi.data);
     }
 
     let x = new ort.Tensor('float32', xTemp, [1, 1, 3]);

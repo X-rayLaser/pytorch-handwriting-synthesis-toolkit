@@ -41,7 +41,7 @@ class HandwritingGenerationExecutor {
       if (e.data.event === "resultsReady") {
         this.notify(e.data.event, e.data.results);
       } else if (e.data.event === "progressChanged") {
-        this.notify(e.data.event, e.data.results, e.data.value);
+        this.notify(e.data.event, e.data.results, e.data.value, e.data.phi);
       } else if (e.data.event === "aborted") {
         this.notify(e.data.event);
       }
@@ -459,7 +459,7 @@ class HandwritingScreen extends React.Component {
             </Row>
           }
 
-          {!this.state.done && <InProgressPanel />}
+          {!this.state.done && <InProgressPanel originalText={this.state.text} />}
           {this.state.done && this.state.showZoomButtons &&
             <ZoomButtonsGroup onZoomIn={this.handleZoomIn} onZoomOut={this.handleZoomOut} 
                               canZoomIn={this.canZoomIn()} canZoomOut={this.canZoomOut()} />
@@ -776,11 +776,13 @@ class InProgressPanel extends React.Component {
     super(props);
 
     this.state = {
-      progress: 0
+      progress: 0,
+      phi: []
     };
 
-    this.progressChangedListener = (results, progress) => {
-      this.setState({progress});
+    this.progressChangedListener = (results, progress, phi) => {
+      phi = phi || [];
+      this.setState({progress, phi});
     };
   }
 
@@ -795,6 +797,17 @@ class InProgressPanel extends React.Component {
   render() {
 
     const text = this.props.text || "Generating a handwriting, please wait...";
+
+    let letters = null;
+
+    if (this.state.phi.length > 0) {
+      let maxPhi = Math.max(...this.state.phi);
+      letters = this.props.originalText.split("").map((char, index) => {
+        let intensity = this.state.phi[index] / maxPhi;
+        return (<ColoredLetter letter={char} color={0} intensity={intensity} />);
+      });
+    }
+
     return (
       <Row className="mb-2">
         <Col>
@@ -808,10 +821,26 @@ class InProgressPanel extends React.Component {
               <ProgressBar now={this.state.progress} />
             </Col>
           </Row>
+          {this.state.phi && 
+            <Row>
+              <Col>
+                {letters}
+              </Col>
+            </Row>
+          }
         </Col>
       </Row>
     );
   }
+}
+
+
+function ColoredLetter(props) {
+  let colorId = props.colorId;
+  let color = `${colorId}${colorId}${colorId}`;
+  return (
+    <span style={{background: '#ddf', color, opacity: props.intensity, fontSize: '4rem'}}>{props.letter}</span>
+  );
 }
 
 
