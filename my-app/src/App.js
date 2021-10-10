@@ -33,17 +33,59 @@ class CanvasConfiguration {
 }
 
 
+class Trottler {
+  constructor(interval=0) {
+    this.prevScheduled = Date.now();
+    this.interval = interval;
+    this.schedule = [];
+  }
+
+  trottle(cb, ...args) {
+    let elapsedMilliseconds = Date.now() - this.prevScheduled;
+    let interval = this.interval;
+    if (Date.now() - this.prevScheduled >= interval) {
+      this.prevScheduled = Date.now();
+      cb(...args);
+    } else {
+      this.prevScheduled += interval;
+      let delay = interval - elapsedMilliseconds;
+      let timeout = setTimeout(() => {
+        cb(...args);
+      }, delay);
+      this.schedule.push(timeout);
+    }
+  }
+
+  clearScheduled() {
+    for (let timeout of this.schedule) {
+      clearTimeout(timeout);
+    }
+
+    this.schedule = [];
+  }
+
+  reset() {
+    this.clearScheduled();
+    this.prevScheduled = Date.now();
+  }
+}
+
+
 class HandwritingGenerationExecutor {
   constructor(worker) {
     this.subscribers = new Map();
 
+    this.trottler = new Trottler();
+
     let workerListener = e => {
+      
       if (e.data.event === "resultsReady") {
-        this.notify(e.data.event, e.data.results);
+        this.trottler.trottle(this.notify.bind(this), e.data.event, e.data.results);
       } else if (e.data.event === "progressChanged") {
-        this.notify(e.data.event, e.data.results, e.data.value, e.data.phi);
+        this.trottler.trottle(this.notify.bind(this), e.data.event, e.data.results, e.data.value, e.data.phi);
       } else if (e.data.event === "aborted") {
         this.notify(e.data.event);
+        this.trottler.clearScheduled();
       }
     };
 
@@ -53,7 +95,13 @@ class HandwritingGenerationExecutor {
     }
   }
 
+  setTrottlingInterval(interval) {
+    this.trottler.reset();
+    this.trottler.interval = interval;
+  }
+
   runNewJob(text, bias, primingSequence, primingText) {
+    this.trottler.reset();
     this.notify("start");
     worker.postMessage({
       event: "start",
@@ -238,7 +286,8 @@ class HandwritingScreen extends React.Component {
       background: '#ffffff',
       strokeColor: '#000000',
       primingText: "",
-      primingSequence: []
+      primingSequence: [],
+      trottleInterval: 25
     };
 
     this.context = null;
@@ -333,6 +382,7 @@ class HandwritingScreen extends React.Component {
     
     this.setState({points: [], done: false, operationStatus: "running"});
 
+    executor.setTrottlingInterval(this.state.trottleInterval);
     executor.runNewJob(this.state.text, this.state.bias, this.state.primingSequence, this.state.primingText);
   }
 
@@ -382,6 +432,17 @@ class HandwritingScreen extends React.Component {
       }
     } catch (e) {
       console.error(e);
+    }
+  }
+
+  handleTrottlingChange(e) {
+    try {
+      let intervalMs = parseInt(e.target.value);
+      if (intervalMs >= 0 && intervalMs <= 100) {
+        this.setState({trottleInterval: intervalMs});
+      }
+    } catch (e) {
+
     }
   }
 
@@ -437,11 +498,13 @@ class HandwritingScreen extends React.Component {
             </InputGroup>
           </Form>
           <SettingsPanel bias={this.state.bias} primingText={this.state.primingText}
+                         trottleInterval={this.state.trottleInterval}
                          onChangeBackground={this.handleChangeBackground} 
                          onChangeStrokeColor={this.handleChangeStrokeColor}
                          backgroundColor={this.state.background}
                          strokeColor={this.state.strokeColor}
                          onBiasChange={this.handleBiasChange}
+                         onTrottleIntervalChange={e => this.handleTrottlingChange(e)}
                          onPrimingTextChange={e => this.setState({primingText: e.target.value})}
                          onPrimingSequenceChange={points => this.setState({primingSequence: points})}
                           />
@@ -713,6 +776,21 @@ class SettingsPanel extends React.Component {
                   Higher values result in a cleaner, nicer looking handwriting, while lower values result in less readable but more diverse samples
                 </Form.Text>
               </Form.Group>
+
+              <Form.Group className="mb-3" controlId="formTrottle">
+                <InputGroup className="mb-3">
+                  <InputGroup.Text id="trottle-addon">Trottling interval (MS)</InputGroup.Text>
+                    <Form.Control type="number" value={this.props.trottleInterval} min={0} max={100} step={1} 
+                      onChange={e => this.props.onTrottleIntervalChange(e)}
+                      aria-label="Trottling interval"
+                      aria-describedby="trottle-addon"
+                    />
+                </InputGroup>
+                <Form.Text className="text-muted">
+                  The parameter helps controlling the speed of writing
+                </Form.Text>
+              </Form.Group>
+
               <MyColorPicker label='Background color' color={this.props.backgroundColor} onChangeComplete={e => this.props.onChangeBackground(e) } />
               <MyColorPicker label='Handwriting color' color={this.props.strokeColor} onChangeComplete={e => this.props.onChangeStrokeColor(e) } />
             </Form>
@@ -804,7 +882,7 @@ class InProgressPanel extends React.Component {
       let maxPhi = Math.max(...this.state.phi);
       letters = this.props.originalText.split("").map((char, index) => {
         let intensity = this.state.phi[index] / maxPhi;
-        return (<ColoredLetter letter={char} color={0} intensity={intensity} />);
+        return (<ColoredLetter key={index} letter={char} color={0} intensity={intensity} />);
       });
     }
 
@@ -839,7 +917,7 @@ function ColoredLetter(props) {
   let colorId = props.colorId;
   let color = `${colorId}${colorId}${colorId}`;
   return (
-    <span style={{background: '#ddf', color, opacity: props.intensity, fontSize: '4rem'}}>{props.letter}</span>
+    <span style={{background: '#eef', color, opacity: props.intensity, fontSize: '4rem'}}>{props.letter}</span>
   );
 }
 
