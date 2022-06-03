@@ -20,6 +20,10 @@ It includes:
 - prediction network architecture
 - exporting models to ONNX
 
+# Requirements
+
+- Python version 3.7.0 or greater
+
 # Installation
 1. Open the terminal in some directory.
 2. Clone the repository
