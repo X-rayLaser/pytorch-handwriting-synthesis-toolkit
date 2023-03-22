@@ -16,6 +16,11 @@ if __name__ == '__main__':
     parser.add_argument("-s", "--steps", type=int, default=700, help="Number of points in generated sequence")
     parser.add_argument("-t", "--trials",  type=int, default=1, help="Number of attempts")
 
+    parser.add_argument(
+        "--thickness", type=int, default=10,
+        help="Handwriting thickness in pixels. It is set to 10 by default."
+    )
+
     args = parser.parse_args()
 
     device = torch.device("cpu")
@@ -26,5 +31,5 @@ if __name__ == '__main__':
 
     for i in range(1, args.trials + 1):
         output_path = os.path.join(args.sample_dir, f'{i}.png')
-        sampler.generate_handwriting(output_path=output_path)
+        sampler.generate_handwriting(output_path=output_path, thickness=args.thickness)
         print(f'Done {i} / {args.trials}')

@@ -105,7 +105,7 @@ class UnconditionalSampler:
         with open(meta_path, 'w') as f:
             f.write(s)
 
-    def generate_handwriting(self, text='', output_path=None):
+    def generate_handwriting(self, text='', output_path=None, thickness=10):
         output_path = output_path or self.derive_file_name(text)
 
         c = self._encode_text(text) if text else None
@@ -114,7 +114,7 @@ class UnconditionalSampler:
                                                       stochastic=True)
         sampled_handwriting = sampled_handwriting.cpu()
         sampled_handwriting = self._undo_normalization(sampled_handwriting)
-        visualize_strokes(sampled_handwriting, output_path, lines=True)
+        visualize_strokes(sampled_handwriting, output_path, lines=True, thickness=thickness)
 
     def derive_file_name(self, text):
         extension = '.png'
@@ -133,7 +133,7 @@ class HandwritingSynthesizer(UnconditionalSampler):
     def create_model_instance(cls, alphabet_size, device, bias):
         return models.SynthesisNetwork.get_default_model(alphabet_size, device, bias=bias)
 
-    def visualize_attention(self, text, output_path=None):
+    def visualize_attention(self, text, output_path=None, thickness=10):
         output_path = output_path or self.derive_file_name(text)
         sentinel = ' '
         text = text + sentinel
@@ -144,5 +144,5 @@ class HandwritingSynthesizer(UnconditionalSampler):
         sampled_handwriting = sampled_handwriting.cpu()
         sampled_handwriting = self._undo_normalization(sampled_handwriting)
 
-        plot_attention_weights(phi, sampled_handwriting, output_path, text=text)
-
+        plot_attention_weights(phi, sampled_handwriting, output_path, text=text,
+                               thickness=thickness)

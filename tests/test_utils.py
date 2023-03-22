@@ -5,6 +5,9 @@ from handwriting_synthesis.data_providers import IAMonDBProvider
 from handwriting_synthesis import data
 
 
+iam_home_path = '../iam_ondb_home'
+
+
 class PaddedSequencesBatchTests(unittest.TestCase):
     def setUp(self):
         s = [[[3], [4]]]
@@ -91,7 +94,7 @@ class VisualizationTests(unittest.TestCase):
     def setUp(self):
         factory = IAMonDBProvider(training_data_size=1,
                                   validation_data_size=1,
-                                  iam_home='../../iam_ondb_home')
+                                  iam_home=iam_home_path)
         data_gen = factory.get_training_data()
 
         self.steps = 700

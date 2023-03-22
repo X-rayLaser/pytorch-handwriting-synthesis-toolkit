@@ -36,12 +36,19 @@ if __name__ == '__main__':
         "--samples_dir", type=str, default='samples',
         help="Path to the directory that will store samples"
     )
+
+    parser.add_argument(
+        "--thickness", type=int, default=10,
+        help="Handwriting thickness in pixels. It is set to 10 by default."
+    )
+
     args = parser.parse_args()
 
     device = torch.device("cpu")
 
     synthesizer = HandwritingSynthesizer.load(args.model_path, device, args.bias)
     output_dir = args.samples_dir
+    thickness = args.thickness
     os.makedirs(output_dir, exist_ok=True)
 
     base_file_name = re.sub('[^0-9a-zA-Z]+', '_', args.text)
@@ -56,7 +63,7 @@ if __name__ == '__main__':
         for i in range(1, args.trials + 1):
             output_path = os.path.join(output_dir, f'{base_file_name}_{i}.png')
             if args.show_weights:
-                synthesizer.visualize_attention(args.text, output_path)
+                synthesizer.visualize_attention(args.text, output_path, thickness=thickness)
             else:
-                synthesizer.generate_handwriting(args.text, output_path)
+                synthesizer.generate_handwriting(args.text, output_path, thickness=thickness)
             print(f'Done {i} / {args.trials}')

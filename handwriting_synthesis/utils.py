@@ -161,15 +161,15 @@ def split_into_components(seq):
     return x, y, eos
 
 
-def visualize_strokes(seq, save_path='img.png', lines=False):
-    im = create_strokes_image(seq, lines)
+def visualize_strokes(seq, save_path='img.png', lines=False, thickness=10):
+    im = create_strokes_image(seq, lines, thickness=thickness)
     if im:
         im.save(save_path)
     return
 
 
 def create_strokes_image(seq, lines=False, shrink_factor=1, suppress_errors=True,
-                         horizontal_padding=100, vertical_padding=20):
+                         horizontal_padding=100, vertical_padding=20, thickness=10):
     x, y, eos = split_into_components(seq)
     x = np.array(x) / shrink_factor
     y = np.array(y) / shrink_factor
@@ -195,9 +195,8 @@ def create_strokes_image(seq, lines=False, shrink_factor=1, suppress_errors=True
     canvas = ImageDraw.Draw(im)
 
     if lines:
-
         for stroke in get_strokes(x_with_offset, y_with_offset, eos):
-            canvas.line(stroke, width=10, fill=0)
+            canvas.line(stroke, width=thickness, fill=0)
     else:
         draw_points(x_with_offset, y_with_offset, canvas)
     return im
@@ -214,7 +213,7 @@ def draw_points(x, y, canvas):
         canvas.ellipse([(xi, yi), (xi + 5, yi + 5)], width=10, fill=0)
 
 
-def plot_attention_weights(phi, seq, save_path='img.png', text=''):
+def plot_attention_weights(phi, seq, save_path='img.png', text='', thickness=10):
     x, y, eos = split_into_components(seq)
 
     strokes = list(get_strokes(x, y, eos))
@@ -238,7 +237,7 @@ def plot_attention_weights(phi, seq, save_path='img.png', text=''):
         axes[0].scatter([single_x] * len(temperatures), y_ticks, c=colors, s=5, cmap='gray')
 
     c = (1, 0, 0, 1)
-    lc = mc.LineCollection(strokes, colors=c, linewidths=2)
+    lc = mc.LineCollection(strokes, colors=c, linewidths=thickness)
     axes[1].add_collection(lc)
     axes[1].autoscale()
     axes[1].invert_yaxis()
@@ -465,25 +464,26 @@ class HandwritingSynthesizer:
         self.sd = sd
         self.stochastic = stochastic
 
-    def synthesize(self, c, output_path, show_attention=False, text=''):
+    def synthesize(self, c, output_path, show_attention=False, text='', thickness=10):
         try:
             if show_attention:
                 sampled_handwriting, phi = self.model.sample_means_with_attention(context=c, steps=self.num_steps,
                                                                                   stochastic=self.stochastic)
                 sampled_handwriting = sampled_handwriting.cpu()
                 sampled_handwriting = sampled_handwriting * self.sd + self.mu
-                plot_attention_weights(phi, sampled_handwriting, output_path, text=text)
+                plot_attention_weights(phi, sampled_handwriting, output_path, text=text,
+                                       thickness=thickness)
             else:
                 sampled_handwriting = self.model.sample_means(context=c, steps=self.num_steps,
                                                               stochastic=self.stochastic)
                 sampled_handwriting = sampled_handwriting.cpu()
                 sampled_handwriting = sampled_handwriting * self.sd + self.mu
-                visualize_strokes(sampled_handwriting, output_path, lines=True)
+                visualize_strokes(sampled_handwriting, output_path, lines=True, thickness=thickness)
         except Exception:
             logger.exception('Error when synthesizing a handwriting:')
 
 
-def text_to_script(synthesizer, text, save_path):
+def text_to_script(synthesizer, text, save_path, thickness=10):
     model = synthesizer.model
     mu = synthesizer.mu
     sd = synthesizer.sd
@@ -499,7 +499,8 @@ def text_to_script(synthesizer, text, save_path):
         s = data.transcriptions_to_tensor(tokenizer, [line])
         sample = model.sample_primed(priming_x, c, s, steps=1500)
         points_seq = sample.cpu() * sd + mu
-        im = create_strokes_image(points_seq, lines=True, shrink_factor=2, suppress_errors=False)
+        im = create_strokes_image(points_seq, lines=True, shrink_factor=2, suppress_errors=False,
+                                  thickness=thickness)
         pil_images.append(im)
         print(f'Generated handwriting for a line: "{line}"')
 

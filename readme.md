@@ -158,7 +158,7 @@ python train.py -b 32 -e 50 -i 300 data checkpoints
 
 Create 1 handwriting for the string 'Text to be converted to handwriting'.
 ```
-python synthesize.py data checkpoints/model_at_epoch_50.pt 'Text to be converted to handwriting ' -b 1
+python synthesize.py checkpoints/Epoch_46 'Text to be converted to handwriting  ' -b 1 --samples_dir=samples --trials=5
 ```
 
 This section very briefly describes steps needed to train (conditional) synthesis network.
@@ -370,7 +370,8 @@ optional arguments:
 ## sample.py
 ```
 $ python sample.py --help
-usage: sample.py [-h] [-b BIAS] [-s STEPS] [-t TRIALS] path sample_dir
+usage: sample.py [-h] [-b BIAS] [-s STEPS] [-t TRIALS] [--thickness THICKNESS]
+                 path sample_dir
 
 Generates (unconditionally) samples from a pretrained prediction network.
 
@@ -386,6 +387,9 @@ optional arguments:
                         Number of points in generated sequence
   -t TRIALS, --trials TRIALS
                         Number of attempts
+  --thickness THICKNESS
+                        Handwriting thickness in pixels. It is set to 10 by
+                        default.
 ```
 
 ## synthesize.py
@@ -393,6 +397,7 @@ optional arguments:
 $ python synthesize.py --help
 usage: synthesize.py [-h] [-b BIAS] [--trials TRIALS] [--show_weights]
                      [--heatmap] [--samples_dir SAMPLES_DIR]
+                     [--thickness THICKNESS]
                      model_path text
 
 Converts a single line of text into a handwriting with a randomly chosen style
@@ -412,12 +417,16 @@ optional arguments:
                         outputs
   --samples_dir SAMPLES_DIR
                         Path to the directory that will store samples
+  --thickness THICKNESS
+                        Handwriting thickness in pixels. It is set to 10 by
+                        default.
 ```
 
 ## txt2script.py
 ```
 $ python txt2script.py --help
 usage: txt2script.py [-h] [-b BIAS] [--output_path OUTPUT_PATH]
+                     [--thickness THICKNESS]
                      model_path input_path
 
 Converts a text file into a handwriting page.
@@ -435,6 +444,9 @@ optional arguments:
                         Path to the generated handwriting file (by default, it
                         will be saved to the current working directory whose
                         name will be input_path with trailing .png extension)
+  --thickness THICKNESS
+                        Handwriting thickness in pixels. It is set to 10 by
+                        default.
 ```
 
 

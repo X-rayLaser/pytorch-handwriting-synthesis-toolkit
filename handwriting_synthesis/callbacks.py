@@ -26,20 +26,6 @@ class EpochModelCheckpoint(Callback):
             self._synthesizer.save(epoch_dir)
 
 
-class IterationModelCheckpoint(Callback):
-    def __init__(self, model, save_dir, save_interval):
-        self._model = model
-        self._save_dir = save_dir
-        self._save_interval = save_interval
-
-        os.makedirs(self._save_dir, exist_ok=False)
-
-    def on_iteration(self, epoch, epoch_iteration, iteration):
-        if (iteration + 1) % self._save_interval == 0:
-            save_path = os.path.join(self._save_dir, f'model_at_epoch_{iteration + 1}.pt')
-            torch.save(self._model.state_dict(), save_path)
-
-
 class HandwritingGenerationCallback(Callback):
     def __init__(self, model, samples_dir, max_length, dataset, iteration_interval=10):
         self.model = model
