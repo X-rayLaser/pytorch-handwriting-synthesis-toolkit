@@ -42,6 +42,11 @@ if __name__ == '__main__':
         help="Handwriting thickness in pixels. It is set to 10 by default."
     )
 
+    parser.add_argument(
+        "--output_file_type", type=str, default="png",
+        help="file type for results, currently only png and svg are supported."
+    )
+
     args = parser.parse_args()
 
     device = torch.device("cpu")
@@ -49,6 +54,8 @@ if __name__ == '__main__':
     synthesizer = HandwritingSynthesizer.load(args.model_path, device, args.bias)
     output_dir = args.samples_dir
     thickness = args.thickness
+    print(args)
+    output_file_type = args.output_file_type
     os.makedirs(output_dir, exist_ok=True)
 
     base_file_name = re.sub('[^0-9a-zA-Z]+', '_', args.text)
@@ -61,7 +68,7 @@ if __name__ == '__main__':
         utils.plot_mixture_densities(synthesizer.model, synthesizer.mu, synthesizer.sd, output_path, c)
     else:
         for i in range(1, args.trials + 1):
-            output_path = os.path.join(output_dir, f'{base_file_name}_{i}.png')
+            output_path = os.path.join(output_dir, f'{base_file_name}_{i}.{output_file_type}')
             if args.show_weights:
                 synthesizer.visualize_attention(args.text, output_path, thickness=thickness)
             else:
