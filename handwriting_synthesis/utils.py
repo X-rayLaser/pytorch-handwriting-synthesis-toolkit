@@ -537,7 +537,7 @@ def text_to_script(synthesizer, text, save_path, thickness=10):
         s = data.transcriptions_to_tensor(tokenizer, [line])
         sample = model.sample_primed(priming_x, c, s, steps=1500)
         points_seq = sample.cpu() * sd + mu
-        im = create_strokes_image(points_seq, lines=True, shrink_factor=2, suppress_errors=False,
+        im = create_strokes_png(points_seq, lines=True, shrink_factor=2, suppress_errors=False,
                                   thickness=thickness)
         pil_images.append(im)
         print(f'Generated handwriting for a line: "{line}"')
