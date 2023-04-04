@@ -166,10 +166,12 @@ def visualize_strokes(seq, save_path='img.png', lines=False, thickness=10):
     fileType = save_path.split('.')[-1]
     if fileType == 'svg':
         im = create_strokes_svg(seq, save_path, lines, thickness=thickness)
-        im.save()
+        if im:
+            im.save()
     else:
         im = create_strokes_png(seq, lines, thickness=thickness)
-        im.save(save_path)
+        if im:
+            im.save(save_path)
     return None
 
 
