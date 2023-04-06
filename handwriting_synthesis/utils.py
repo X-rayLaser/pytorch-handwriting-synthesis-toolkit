@@ -12,6 +12,7 @@ from . import data
 from .metrics import MovingAverage
 from .losses import BiVariateGaussian
 import logging
+import svgwrite
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -162,13 +163,50 @@ def split_into_components(seq):
 
 
 def visualize_strokes(seq, save_path='img.png', lines=False, thickness=10):
-    im = create_strokes_image(seq, lines, thickness=thickness)
-    if im:
-        im.save(save_path)
-    return
+    fileType = save_path.split('.')[-1]
+    if fileType == 'svg':
+        im = create_strokes_svg(seq, save_path, lines, thickness=thickness)
+        if im:
+            im.save()
+    else:
+        im = create_strokes_png(seq, lines, thickness=thickness)
+        if im:
+            im.save(save_path)
+    return None
 
 
-def create_strokes_image(seq, lines=False, shrink_factor=1, suppress_errors=True,
+def create_strokes_svg(seq, save_path, lines=False, shrink_factor=1, suppress_errors=True,
+                         horizontal_padding=100, vertical_padding=20, thickness=10):
+    x, y, eos = split_into_components(seq)
+    x = np.array(x) / shrink_factor
+    y = np.array(y) / shrink_factor
+    x_with_offset = x - np.floor(x.min()) + horizontal_padding
+    y_with_offset = y - np.floor(y.min()) + vertical_padding
+
+    view_width = int(x_with_offset.max() + horizontal_padding)
+    view_height = int(y_with_offset.max() + vertical_padding)
+    
+    #create an svg with white background and the relevant size
+    dwg = svgwrite.Drawing(filename=save_path)
+    dwg.viewbox(width=view_width, height=view_height)
+    dwg.add(dwg.rect(insert=(0, 0), size=(view_width, view_height), fill='white'))
+
+    if lines:
+        for stroke in get_strokes(x_with_offset, y_with_offset, eos):
+            pat = ""
+            for i in stroke:
+                pat += str(i[0]) + ", "
+                pat += str(i[1]) + " "
+                p = "M " +pat
+
+            path = svgwrite.path.Path(p)
+            path = path.stroke(color="black", width=thickness, linecap='round').fill("none")
+            dwg.add(path)
+
+    return dwg
+
+
+def create_strokes_png(seq, lines=False, shrink_factor=1, suppress_errors=True,
                          horizontal_padding=100, vertical_padding=20, thickness=10):
     x, y, eos = split_into_components(seq)
     x = np.array(x) / shrink_factor
@@ -499,7 +537,7 @@ def text_to_script(synthesizer, text, save_path, thickness=10):
         s = data.transcriptions_to_tensor(tokenizer, [line])
         sample = model.sample_primed(priming_x, c, s, steps=1500)
         points_seq = sample.cpu() * sd + mu
-        im = create_strokes_image(points_seq, lines=True, shrink_factor=2, suppress_errors=False,
+        im = create_strokes_png(points_seq, lines=True, shrink_factor=2, suppress_errors=False,
                                   thickness=thickness)
         pil_images.append(im)
         print(f'Generated handwriting for a line: "{line}"')
