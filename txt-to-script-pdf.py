@@ -5,7 +5,12 @@ import torch
 
 from handwriting_synthesis import utils
 from handwriting_synthesis.sampling import HandwritingSynthesizer
+from reportlab.pdfgen import canvas
 
+def save_as_pdf(image_path, pdf_path):
+    from PIL import Image
+    img = Image.open(image_path)
+    img.save(pdf_path, "PDF", resolution=100.0)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Converts a text file into a handwriting page.')
