@@ -131,8 +131,9 @@ Download the data set and unzip it into iam_ondb_home folder. The layout of the 
 │   └── lineStrokes
 ├── original-xml-all
 │   └── original
-└── original-xml-part
-    └── original
+├── original-xml-part
+|   └── original
+└── writers.xml
 ```
 
 ## Quickstart
